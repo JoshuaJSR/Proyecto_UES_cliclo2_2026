@@ -1,16 +1,20 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- */
 
 package com.ues.procesamiento_pago;
 
-/**
- *
- * @author joshj
- */
+import com.mongodb.MongoException;
+import com.ues.procesamiento_pago.config.MongoDBConnection;
+
+
 public class Procesamiento_pago {
 
     public static void main(String[] args) {
-        System.out.println("Hello World!");
+        MongoDBConnection mongoDB = new MongoDBConnection("localhost", 27017);
+        
+        try {
+            mongoDB.crearConexion();
+        } catch (MongoException e) {
+            System.out.println("Error: " + e.getMessage());
+            return;
+        }
     }
 }
