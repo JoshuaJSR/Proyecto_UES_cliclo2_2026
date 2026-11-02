@@ -1,10 +1,12 @@
 package view;
 
+import Model.Usuario;
 import org.mindrot.jbcrypt.BCrypt;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
 import com.ues.procesamiento_pago.config.MongoDBConnection;
+import dao.UsuarioDAO;
 import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Dimension;
@@ -30,18 +32,18 @@ public class RegisterForm extends JFrame {
     private JComboBox<String> cmbRol;    
     private JButton btnRegistrar;
     
-    private MongoDBConnection mongoDB;
     private MongoCollection<Document> usuarios;
-    
+
+    private MongoDBConnection mongoDB;
+    private UsuarioDAO dao;    
     public RegisterForm(MongoDBConnection mongoDB) {
-        this.mongoDB = mongoDB;
-        
-        if (this.mongoDB != null && this.mongoDB.getDatabase() != null) {
-            MongoDatabase db = this.mongoDB.getDatabase();
-            this.usuarios = db.getCollection("usuarios");
-        } else {
-            JOptionPane.showMessageDialog(this, "Advertencia: No hay una conexión activa a MongoDB.");
-        }
+         this.mongoDB = mongoDB;
+         
+         if (this.mongoDB != null && this.mongoDB.getDatabase() != null) {
+             this.dao = new UsuarioDAO(this.mongoDB);
+         } else {
+             JOptionPane.showMessageDialog(this, "Advertencia: No hay una conexión activa a MongoDB.");
+         }
         
         setTitle("Registro de usuarios");
         setSize(420, 500);
@@ -130,34 +132,22 @@ public class RegisterForm extends JFrame {
             String nombre = txtNombre.getText().trim();
             String password = new String(txtPassword.getPassword());
             String rol = cmbRol.getSelectedItem().toString();
-            
-            //Hashear contraseña
-            String passwordHash = BCrypt.hashpw(password, BCrypt.gensalt());
-            
-            //filtro para ver si el nombre de usuario ya esta en uso
-            Document existente = this.usuarios.find(Filters.eq("nombre", nombre)).first();
-            if (existente != null) {
-                JOptionPane.showMessageDialog(this, "El nombre de usuario ya está registrado.", "Advertencia", JOptionPane.WARNING_MESSAGE);
-                return;
-            }
-            
             if (nombre.isEmpty() || password.isEmpty()) {
                 JOptionPane.showMessageDialog(this, "Rellene todos los campos", "Advertencia", JOptionPane.WARNING_MESSAGE);
                 return;
             }
-            if (this.usuarios == null) {
-                JOptionPane.showMessageDialog(this, "No hay conexión con la colección de usuarios.", "Error", JOptionPane.ERROR_MESSAGE);
+            if (this.dao == null) {
+                JOptionPane.showMessageDialog(this, "No hay conexión con la base de datos.", "Error", JOptionPane.ERROR_MESSAGE);
                 return;
             }
+            
             try {
-                Document newUsuario = new Document();
-                newUsuario.append("nombre", nombre);
-                newUsuario.append("password", passwordHash);
-                newUsuario.append("rol", rol);
-                newUsuario.append("createdAt", new Date());
-
-                this.usuarios.insertOne(newUsuario);
-                
+                if (dao.existe(nombre)) {
+                    JOptionPane.showMessageDialog(this, "El nombre de usuario ya está registrado.", "Advertencia", JOptionPane.WARNING_MESSAGE);
+                    return;
+                }
+                String passwordHash = BCrypt.hashpw(password, BCrypt.gensalt());
+                dao.insertar(new Usuario(nombre, passwordHash, rol));
                 JOptionPane.showMessageDialog(this, "¡Usuario registrado exitosamente!");
                 txtNombre.setText("");
                 txtPassword.setText("");
