@@ -22,25 +22,26 @@ public class Venta {
        return precio.multiply(BigDecimal.valueOf(cantidad));
     }
 
-    public void setId(int id) {
-        this.id = id;
+    public int getId() {
+        return id;
     }
 
-    public void setNombre(String nombre) {
-        this.nombre = nombre;
+    public String getNombre() {
+        return nombre;
     }
 
-    public void setPrecio(BigDecimal precio) {
-        this.precio = precio;
+    public BigDecimal getPrecio() {
+        return precio;
     }
 
-    public void setCantidad(int cantidad) {
-        this.cantidad = cantidad;
+    public int getCantidad() {
+        return cantidad;
     }
 
-    public void setTotal(BigDecimal total) {
-        this.total = total;
+    public BigDecimal getTotal() {
+        return total;
     }
+
     
     
 }
