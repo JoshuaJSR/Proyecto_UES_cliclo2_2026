@@ -46,7 +46,7 @@ public class RegisterForm extends JFrame {
         setTitle("Registro de usuarios");
         setSize(420, 500);
         setLocationRelativeTo(null);
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setResizable(false);
         
         JPanel mainPanel = new JPanel(new GridBagLayout());
