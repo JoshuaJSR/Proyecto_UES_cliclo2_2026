@@ -34,7 +34,6 @@ public abstract class MetodoPago implements IMetodoPago{
         }
 
         if (ejecutarCobro(venta.getTotal())) {
-            mostrarComprobante(venta.getTotal());
             return new Transaccion(venta.getId(), 
                     nombre, venta.getTotal(), 
                     EstadoPago.PROCESADO);
@@ -49,6 +48,6 @@ public abstract class MetodoPago implements IMetodoPago{
     //metodos abstractos
     protected abstract boolean validarEspecifico(BigDecimal monto);
     protected abstract boolean ejecutarCobro(BigDecimal monto);
-    protected abstract void mostrarComprobante(BigDecimal monto);
+   // protected abstract void mostrarComprobante(BigDecimal monto);
     
 }
