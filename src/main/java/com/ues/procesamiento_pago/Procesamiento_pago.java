@@ -3,6 +3,7 @@ package com.ues.procesamiento_pago;
 
 import com.mongodb.MongoException;
 import com.ues.procesamiento_pago.config.MongoDBConnection;
+import view.RegisterForm;
 
 
 public class Procesamiento_pago {
@@ -16,5 +17,10 @@ public class Procesamiento_pago {
             System.out.println("Error: " + e.getMessage());
             return;
         }
+        
+        javax.swing.SwingUtilities.invokeLater(() -> {
+            RegisterForm ventana = new RegisterForm(mongoDB);
+            ventana.setVisible(true);
+        });
     }
 }
