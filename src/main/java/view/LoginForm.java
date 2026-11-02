@@ -129,7 +129,7 @@ public class LoginForm extends JFrame {
                 BCrypt.Result result = BCrypt.verifyer().verify(password.toCharArray(), user.getString("password"));
                 if (result.verified) {
                     JOptionPane.showMessageDialog(this, "¡Bienvenido " + nombre + "!");
-                    new RegisterForm(mongoDB).setVisible(true);
+                    new MainForm(this.mongoDB, nombre, user.getString("rol")).setVisible(true);
                     this.dispose();
                 } else {
                     JOptionPane.showMessageDialog(this, "Usuario o contraseña incorrectos", "Error", JOptionPane.ERROR_MESSAGE);
