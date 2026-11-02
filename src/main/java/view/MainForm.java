@@ -62,7 +62,12 @@ public class MainForm extends JFrame {
 
         JMenu menuMantenimiento = crearMenu("Mantenimiento");
         JMenuItem itemRegistroUsuarios = crearItem("Registro de usuarios");
+        itemRegistroUsuarios.setEnabled("Admin".equals(rol));
         menuMantenimiento.add(itemRegistroUsuarios);
+        
+        if (!itemRegistroUsuarios.isEnabled()) {
+            itemRegistroUsuarios.setForeground(new Color(90, 90, 90));
+        }
 
         JMenu menuMovimientos = crearMenu("Movimientos");
         JMenuItem itemIngresoVentas = crearItem("Ingreso de ventas");
