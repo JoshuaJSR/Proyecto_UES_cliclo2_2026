@@ -1,5 +1,6 @@
 package view;
 
+import Model.Usuario;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.ues.procesamiento_pago.config.MongoDBConnection;
@@ -21,6 +22,8 @@ import javax.swing.JTextField;
 import org.bson.Document;
 import at.favre.lib.crypto.bcrypt.BCrypt;
 import com.mongodb.client.model.Filters;
+import dao.UsuarioDAO;
+
 
 public class LoginForm extends JFrame {
     private JTextField txtNombre;
@@ -29,15 +32,16 @@ public class LoginForm extends JFrame {
 
     private MongoDBConnection mongoDB;
     private MongoCollection<Document> usuarios;
-
+    private UsuarioDAO dao;
+    
     public LoginForm(MongoDBConnection mongoDB) {
         this.mongoDB = mongoDB;
-
+        
         if (this.mongoDB != null && this.mongoDB.getDatabase() != null) {
-            MongoDatabase db = this.mongoDB.getDatabase();
-            this.usuarios = db.getCollection("usuarios");
-        } else {
-            JOptionPane.showMessageDialog(this, "Advertencia: No hay una conexión activa a MongoDB.");
+            this.dao = new UsuarioDAO(this.mongoDB);
+        } else 
+        {
+        JOptionPane.showMessageDialog(this, "Advertencia: No hay una conexión activa a MongoDB.");
         }
 
         setTitle("Inicio de sesión");
@@ -115,21 +119,20 @@ public class LoginForm extends JFrame {
                 JOptionPane.showMessageDialog(this, "Rellene todos los campos", "Advertencia", JOptionPane.WARNING_MESSAGE);
                 return;
             }
-            if (this.usuarios == null) {
-                JOptionPane.showMessageDialog(this, "No hay conexión con la colección de usuarios.", "Error", JOptionPane.ERROR_MESSAGE);
+            if (this.dao == null) {
+                JOptionPane.showMessageDialog(this, "No hay conexión con la base de datos.", "Error", JOptionPane.ERROR_MESSAGE);
                 return;
             }
             try {
-                Document user = this.usuarios.find(Filters.eq("nombre", nombre)).first();
-         
-                if (user == null) {
+                Usuario usuario = dao.buscarPorNombre(nombre);
+                if (usuario == null) {
                     JOptionPane.showMessageDialog(this, "Usuario o contraseña incorrectos", "Error", JOptionPane.ERROR_MESSAGE);
                     return;
                 }
-                BCrypt.Result result = BCrypt.verifyer().verify(password.toCharArray(), user.getString("password"));
+                
+                BCrypt.Result result = BCrypt.verifyer().verify(password.toCharArray(), usuario.getPassword());
                 if (result.verified) {
-                    JOptionPane.showMessageDialog(this, "¡Bienvenido " + nombre + "!");
-                    new MainForm(this.mongoDB, nombre, user.getString("rol")).setVisible(true);
+                    new MainForm(this.mongoDB, usuario.getNombre(), usuario.getRol()).setVisible(true);
                     this.dispose();
                 } else {
                     JOptionPane.showMessageDialog(this, "Usuario o contraseña incorrectos", "Error", JOptionPane.ERROR_MESSAGE);
