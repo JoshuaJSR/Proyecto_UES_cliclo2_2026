@@ -1,5 +1,6 @@
 package view;
 
+import org.mindrot.jbcrypt.BCrypt;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
@@ -129,6 +130,10 @@ public class RegisterForm extends JFrame {
             String nombre = txtNombre.getText().trim();
             String password = new String(txtPassword.getPassword());
             String rol = cmbRol.getSelectedItem().toString();
+            
+            //Hashear contraseña
+            String passwordHash = BCrypt.hashpw(password, BCrypt.gensalt());
+            
             //filtro para ver si el nombre de usuario ya esta en uso
             Document existente = this.usuarios.find(Filters.eq("nombre", nombre)).first();
             if (existente != null) {
@@ -147,7 +152,7 @@ public class RegisterForm extends JFrame {
             try {
                 Document newUsuario = new Document();
                 newUsuario.append("nombre", nombre);
-                newUsuario.append("password", password);
+                newUsuario.append("password", passwordHash);
                 newUsuario.append("rol", rol);
                 newUsuario.append("createdAt", new Date());
 
