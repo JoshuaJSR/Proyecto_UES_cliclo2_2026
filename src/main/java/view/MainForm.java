@@ -96,7 +96,7 @@ public class MainForm extends JFrame {
         });
 
         itemIngresoVentas.addActionListener(e -> {
-            JOptionPane.showMessageDialog(this, "Ingreso de ventas (pendiente)");
+            new VentasForm(this.mongoDB).setVisible(true);
         });
 
         itemConsultarVentas.addActionListener(e -> {

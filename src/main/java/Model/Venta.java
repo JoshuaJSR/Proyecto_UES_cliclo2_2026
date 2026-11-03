@@ -1,7 +1,8 @@
-
 package Model;
 
 import java.math.BigDecimal;
+import java.util.Date;
+import org.bson.Document;
 
 public class Venta {
     private int id;
@@ -9,15 +10,17 @@ public class Venta {
     private BigDecimal precio;
     private int cantidad;
     private BigDecimal total;
+    private Date fecha;
     
     public Venta(String nombre, BigDecimal precio, int cantidad) {
         this.nombre = nombre;
         this.precio = precio;
         this.cantidad = cantidad;
         this.total = calcularTotal(cantidad, precio);
+        this.fecha = new Date();
     }
     
-    //calcular tota
+    //calcular total
     public BigDecimal calcularTotal(int cantidad, BigDecimal precio){
        return precio.multiply(BigDecimal.valueOf(cantidad));
     }
@@ -42,6 +45,16 @@ public class Venta {
         return total;
     }
 
-    
-    
+    public Date getFecha() {
+        return fecha;
+    }
+
+    //Mapea la venta a un Document de MongoDB para guardarlo en la coleccion ventas
+    public Document toDocument() {
+        return new Document("nombre", nombre)
+                .append("precio", precio)
+                .append("cantidad", cantidad)
+                .append("total", total)
+                .append("fecha", fecha);
+    }
 }
