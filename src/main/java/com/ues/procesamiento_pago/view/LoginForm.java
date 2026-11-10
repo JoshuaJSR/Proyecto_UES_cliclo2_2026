@@ -1,10 +1,5 @@
 package com.ues.procesamiento_pago.view;
 
-import com.ues.procesamiento_pago.Model.Usuario;
-import com.mongodb.client.MongoCollection;
-import com.mongodb.client.MongoDatabase;
-import com.ues.procesamiento_pago.config.MongoDBConnection;
-
 import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Dimension;
@@ -24,10 +19,13 @@ import javax.swing.JTextField;
 
 import org.bson.Document;
 
-import at.favre.lib.crypto.bcrypt.BCrypt;
-
-import com.mongodb.client.model.Filters;
+import com.mongodb.client.MongoCollection;
+import com.ues.procesamiento_pago.Model.Usuario;
+import com.ues.procesamiento_pago.config.MongoDBConnection;
 import com.ues.procesamiento_pago.dao.UsuarioDAO;
+import com.ues.procesamiento_pago.util.Estilos;
+
+import at.favre.lib.crypto.bcrypt.BCrypt;
 
 
 
@@ -87,7 +85,7 @@ public class LoginForm extends JFrame {
         cardPanel.add(lblNombre, gbc);
 
         txtNombre = new JTextField();
-        estilarCampo(txtNombre);
+        Estilos.estilarCampo(txtNombre);
         gbc.gridy = 2;
         cardPanel.add(txtNombre, gbc);
 
@@ -98,7 +96,7 @@ public class LoginForm extends JFrame {
         cardPanel.add(lblPassword, gbc);
 
         txtPassword = new JPasswordField();
-        estilarCampo(txtPassword);
+        Estilos.estilarCampo(txtPassword);
         gbc.gridy = 4;
         cardPanel.add(txtPassword, gbc);
 
@@ -152,15 +150,4 @@ public class LoginForm extends JFrame {
         });
     }
         
-    private void estilarCampo(JTextField campo) {
-        campo.setFont(new Font("SansSerif", Font.PLAIN, 13));
-        campo.setPreferredSize(new Dimension(280, 40));
-        campo.setBackground(Color.BLACK);
-        campo.setForeground(Color.WHITE);
-        campo.setCaretColor(Color.WHITE);
-        campo.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(new Color(60, 60, 60), 1),
-            BorderFactory.createEmptyBorder(5, 12, 5, 12)
-        ));
-    }
 }

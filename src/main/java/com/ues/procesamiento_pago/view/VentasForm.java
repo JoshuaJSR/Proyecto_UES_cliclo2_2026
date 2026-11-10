@@ -1,7 +1,6 @@
 package com.ues.procesamiento_pago.view;
 
 import java.awt.Color;
-import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
@@ -23,6 +22,7 @@ import javax.swing.table.DefaultTableModel;
 import com.ues.procesamiento_pago.Model.Venta;
 import com.ues.procesamiento_pago.config.MongoDBConnection;
 import com.ues.procesamiento_pago.dao.VentaDAO;
+import com.ues.procesamiento_pago.util.Estilos;
 
 public class VentasForm extends JFrame {
     private JTextField txtNombre;
@@ -97,7 +97,7 @@ public class VentasForm extends JFrame {
         
         gbc.gridy = 2;
         txtNombre = new JTextField();
-        estilarCampoTexto(txtNombre); 
+        Estilos.estilarCampo(txtNombre); 
         panel.add(txtNombre, gbc);
         
         //precio y cantidad
@@ -110,11 +110,11 @@ public class VentasForm extends JFrame {
         gbc.gridy = 4;
         gbc.weightx = 0.5;
         txtPrecio = new JTextField();
-        estilarCampoTexto(txtPrecio);
+        Estilos.estilarCampo(txtPrecio);
         panel.add(txtPrecio, gbc);
         gbc.gridx = 1;
         txtCantidad = new JTextField();
-        estilarCampoTexto(txtCantidad);
+        Estilos.estilarCampo(txtCantidad);
         panel.add(txtCantidad, gbc);
         gbc.weightx = 0;
         gbc.gridx = 0;
@@ -122,15 +122,5 @@ public class VentasForm extends JFrame {
         
         // Añadir el panel al JFrame
         add(panel);    
-    }
-    private void estilarCampoTexto(JTextField campo) {
-        campo.setPreferredSize(new Dimension(campo.getPreferredSize().width, 35));
-        campo.setBackground(new Color(25, 25, 25));
-        campo.setForeground(Color.WHITE);
-        campo.setCaretColor(Color.WHITE);
-        campo.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(COLOR_BORDE_CAMPO, 1),
-            BorderFactory.createEmptyBorder(5, 8, 5, 8)
-        ));
-    }
+    }   
 }
