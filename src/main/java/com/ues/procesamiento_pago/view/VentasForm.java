@@ -261,7 +261,6 @@ public class VentasForm extends JFrame {
                 ventasPendientes.add(ventaTemp);
 
                 int item = modeloTabla.getRowCount() + 1;
-                // Cantidad ahora va solo en número, sin la palabra "unidades"
                 modeloTabla.addRow(new Object[]{item, ventaTemp.getNombre(), "$" + ventaTemp.getPrecio(), ventaTemp.getCantidad(), "$" + ventaTemp.getTotal()});
 
                 txtNombre.setText("");
