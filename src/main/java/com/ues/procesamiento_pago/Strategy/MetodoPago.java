@@ -1,11 +1,10 @@
 
-package Strategy;
-import Model.EstadoPago;
-import Model.Transaccion;
-import Model.Venta;
+package com.ues.procesamiento_pago.Strategy;
 import java.math.BigDecimal;
-import java.util.Scanner;
 
+import com.ues.procesamiento_pago.Model.EstadoPago;
+import com.ues.procesamiento_pago.Model.Transaccion;
+import com.ues.procesamiento_pago.Model.Venta;
 
 public abstract class MetodoPago implements IMetodoPago{
     protected String nombre;

@@ -1,9 +1,10 @@
-package view;
+package com.ues.procesamiento_pago.view;
 
-import Model.Usuario;
+import com.ues.procesamiento_pago.Model.Usuario;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.ues.procesamiento_pago.config.MongoDBConnection;
+
 import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Dimension;
@@ -11,6 +12,7 @@ import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
+
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JFrame;
@@ -19,10 +21,14 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPasswordField;
 import javax.swing.JTextField;
+
 import org.bson.Document;
+
 import at.favre.lib.crypto.bcrypt.BCrypt;
+
 import com.mongodb.client.model.Filters;
-import dao.UsuarioDAO;
+import com.ues.procesamiento_pago.dao.UsuarioDAO;
+
 
 
 public class LoginForm extends JFrame {
@@ -132,7 +138,10 @@ public class LoginForm extends JFrame {
                 
                 BCrypt.Result result = BCrypt.verifyer().verify(password.toCharArray(), usuario.getPassword());
                 if (result.verified) {
-                    new MainForm(this.mongoDB, usuario.getNombre(), usuario.getRol()).setVisible(true);
+                    JFrame mainForm = (JFrame) Class.forName("com.ues.procesamiento_pago.view.MainForm")
+                        .getConstructor(MongoDBConnection.class, String.class, String.class)
+                        .newInstance(this.mongoDB, usuario.getNombre(), usuario.getRol());
+                    mainForm.setVisible(true);
                     this.dispose();
                 } else {
                     JOptionPane.showMessageDialog(this, "Usuario o contraseña incorrectos", "Error", JOptionPane.ERROR_MESSAGE);

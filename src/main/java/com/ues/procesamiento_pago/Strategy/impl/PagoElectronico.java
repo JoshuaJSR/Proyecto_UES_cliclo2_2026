@@ -1,9 +1,10 @@
 
-package Strategy.impl;
+package com.ues.procesamiento_pago.Strategy.impl;
 
-import Strategy.MetodoPago;
 import java.math.BigDecimal;
 import java.util.Scanner;
+
+import com.ues.procesamiento_pago.Strategy.MetodoPago;
 
 public class PagoElectronico extends MetodoPago {
     private String correoCuenta;

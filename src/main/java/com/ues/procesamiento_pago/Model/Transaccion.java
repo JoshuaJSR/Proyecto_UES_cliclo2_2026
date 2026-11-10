@@ -1,5 +1,5 @@
 
-package Model;
+package com.ues.procesamiento_pago.Model;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;

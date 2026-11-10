@@ -1,11 +1,12 @@
-package dao;
+package com.ues.procesamiento_pago.dao;
 
 //clase que concentra el acceso a la Mongo
-import Model.Usuario;
+import org.bson.Document;
+
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.model.Filters;
+import com.ues.procesamiento_pago.Model.Usuario;
 import com.ues.procesamiento_pago.config.MongoDBConnection;
-import org.bson.Document;
 
 public class UsuarioDAO {
     private final MongoCollection<Document> coleccion;

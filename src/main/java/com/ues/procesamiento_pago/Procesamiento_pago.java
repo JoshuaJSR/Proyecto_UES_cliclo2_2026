@@ -3,7 +3,7 @@ package com.ues.procesamiento_pago;
 
 import com.mongodb.MongoException;
 import com.ues.procesamiento_pago.config.MongoDBConnection;
-import view.LoginForm;
+import com.ues.procesamiento_pago.view.LoginForm;
 
 
 public class Procesamiento_pago {

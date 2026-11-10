@@ -1,7 +1,8 @@
-package Model;
+package com.ues.procesamiento_pago.Model;
 
 import java.math.BigDecimal;
 import java.util.Date;
+
 import org.bson.Document;
 
 public class Venta {

@@ -1,12 +1,5 @@
-package view;
+package com.ues.procesamiento_pago.view;
 
-import Model.Usuario;
-import org.mindrot.jbcrypt.BCrypt;
-import com.mongodb.client.MongoCollection;
-import com.mongodb.client.MongoDatabase;
-import com.mongodb.client.model.Filters;
-import com.ues.procesamiento_pago.config.MongoDBConnection;
-import dao.UsuarioDAO;
 import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Dimension;
@@ -14,7 +7,7 @@ import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
-import java.util.Date;
+
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
@@ -24,7 +17,14 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPasswordField;
 import javax.swing.JTextField;
+
 import org.bson.Document;
+import org.mindrot.jbcrypt.BCrypt;
+
+import com.mongodb.client.MongoCollection;
+import com.ues.procesamiento_pago.Model.Usuario;
+import com.ues.procesamiento_pago.config.MongoDBConnection;
+import com.ues.procesamiento_pago.dao.UsuarioDAO;
 
 public class RegisterForm extends JFrame {
     private JTextField txtNombre;

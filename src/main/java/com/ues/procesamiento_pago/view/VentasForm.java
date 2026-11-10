@@ -1,8 +1,5 @@
-package view;
+package com.ues.procesamiento_pago.view;
 
-import Model.Venta;
-import com.ues.procesamiento_pago.config.MongoDBConnection;
-import dao.VentaDAO;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Font;
@@ -11,6 +8,7 @@ import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.util.ArrayList;
 import java.util.List;
+
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
@@ -21,6 +19,10 @@ import javax.swing.JPanel;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.table.DefaultTableModel;
+
+import com.ues.procesamiento_pago.Model.Venta;
+import com.ues.procesamiento_pago.config.MongoDBConnection;
+import com.ues.procesamiento_pago.dao.VentaDAO;
 
 public class VentasForm extends JFrame {
     private JTextField txtNombre;

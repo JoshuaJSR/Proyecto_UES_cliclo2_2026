@@ -1,9 +1,10 @@
-package Strategy;
+package com.ues.procesamiento_pago.Strategy;
 
-import Model.Transaccion;
-import Model.Venta;
 import java.math.BigDecimal;
 import java.util.Scanner;
+
+import com.ues.procesamiento_pago.Model.Transaccion;
+import com.ues.procesamiento_pago.Model.Venta;
 
 public interface IMetodoPago {
     boolean validar(BigDecimal monto);

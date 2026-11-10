@@ -1,4 +1,4 @@
-package view;
+package com.ues.procesamiento_pago.view;
 
 import com.ues.procesamiento_pago.config.MongoDBConnection;
 import java.awt.BorderLayout;
