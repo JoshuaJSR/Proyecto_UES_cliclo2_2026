@@ -25,7 +25,7 @@ public class VentaDAO {
         coleccion.insertOne(venta.toDocument(estado, metodoPago, usuario));
     }
 
-    // calcula el proximo numero de venta, 1 si no hay ventas registradas
+    // calcula el proximo numero de venta: 1 si no hay ventas registradas
     public int siguienteNumeroVenta() {
         Document ultimaVenta = coleccion.find()
                 .sort(new Document("id", -1))

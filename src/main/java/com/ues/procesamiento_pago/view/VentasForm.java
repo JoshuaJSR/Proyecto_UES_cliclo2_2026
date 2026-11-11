@@ -54,7 +54,7 @@ public class VentasForm extends JFrame {
     private TableVentasModel modeloTabla;
     private JTable tablaVentas;
 
-    // variable para controlar si estamos editando una fila existente
+    // variable para controlar si estamos editando una fila existente (-1 = nuevo)
     private int indiceFilaSeleccionada = -1;
 
     // numero de venta que se asignara a los items de la venta que se esta registrando
@@ -294,32 +294,53 @@ public class VentasForm extends JFrame {
             return;
         }
 
+        int numeroRegistrado = numeroVentaActual;
+        String metodoNombre = (String) comboMetodos.getSelectedItem();
         IMetodoPago metodoPago = pedirMetodoPago(totalVenta());
+
+        EstadoPago estado;
+        Transaccion transaccion = null;
         if (metodoPago == null) {
-            return;
-        }
-
-        Venta venta = new Venta("Venta de " + ventasPendientes.size() + " producto(s)", totalVenta(), 1);
-        Transaccion transaccion = metodoPago.procesar(venta);
-        if (transaccion.getEstado() != EstadoPago.PROCESADO) {
-            String motivo = metodoPago.getMensajeError();
-            JOptionPane.showMessageDialog(this,
-                    motivo != null ? motivo : "El pago fue rechazado.",
-                    "Pago rechazado", JOptionPane.ERROR_MESSAGE);
-            return;
-        }
-
-        if (dao != null) {
-            
-            for (Venta item : ventasPendientes) {
-                item.setId(numeroVentaActual);
-                dao.insertar(item, transaccion.getEstado(), transaccion.getMetodo(), usuario);
+            //si no se capturaron los datos del pago,la venta puede guardarse como pendiente
+            int opcion = JOptionPane.showConfirmDialog(this,
+                    "No se completaron los datos del método de pago.\n¿Desea guardar la venta N° "
+                            + numeroRegistrado + " con estado PENDIENTE?",
+                    "Venta pendiente", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
+            if (opcion != JOptionPane.YES_OPTION) {
+                return;
             }
+            estado = EstadoPago.PENDIENTE;
+        } else {
+            Venta resumen = new Venta("Venta de " + ventasPendientes.size() + " producto(s)", totalVenta(), 1);
+            resumen.setId(numeroRegistrado);
+            transaccion = metodoPago.procesar(resumen);
+            estado = transaccion.getEstado();
         }
-        numeroVentaActual = dao != null ? dao.siguienteNumeroVenta() : numeroVentaActual + 1;
+
+        if (dao == null) {
+            JOptionPane.showMessageDialog(this, "No hay conexión con la base de datos: la venta no se guardó.",
+                    "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        // la venta se guarda siempre, con el estado que resulto de la validacion:
+        // PROCESADO, RECHAZADO (datos invalidos) o PENDIENTE (datos no capturados)
+        for (Venta item : ventasPendientes) {
+            item.setId(numeroRegistrado);
+            dao.insertar(item, estado, metodoNombre, usuario);
+        }
+        numeroVentaActual = dao.siguienteNumeroVenta();
         txtNumeroVenta.setText(String.valueOf(numeroVentaActual));
 
-        JOptionPane.showMessageDialog(this, metodoPago.comprobante(transaccion), "Venta registrada", JOptionPane.INFORMATION_MESSAGE);
+        if (estado == EstadoPago.PROCESADO && metodoPago != null && transaccion != null) {
+            JOptionPane.showMessageDialog(this, metodoPago.comprobante(transaccion), "Venta registrada", JOptionPane.INFORMATION_MESSAGE);
+        } else {
+            String motivo = metodoPago != null ? metodoPago.getMensajeError() : null;
+            JOptionPane.showMessageDialog(this,
+                    "La venta N° " + numeroRegistrado + " se guardó con estado " + estado + ".\n"
+                            + (motivo != null ? motivo : "Pago no confirmado."),
+                    "Venta registrada con estado " + estado, JOptionPane.WARNING_MESSAGE);
+        }
         modeloTabla.limpiar();
         indiceFilaSeleccionada = -1;
         btnAgregar.setText("AGREGAR PRODUCTO");
