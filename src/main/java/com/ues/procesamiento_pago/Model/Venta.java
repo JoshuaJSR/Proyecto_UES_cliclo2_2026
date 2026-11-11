@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.Date;
 
 import org.bson.Document;
+import org.bson.types.Decimal128;
 
 public final class Venta {
     private int id;
@@ -30,6 +31,7 @@ public final class Venta {
         return id;
     }
 
+    // numero de venta que se asigna al registrar la venta
     public void setId(int id) {
         this.id = id;
     }
@@ -52,6 +54,32 @@ public final class Venta {
 
     public Date getFecha() {
         return fecha;
+    }
+
+    //Reconstruye una venta a partir de un documento de la coleccion ventas
+    public static Venta fromDocument(Document doc) {
+        Venta venta = new Venta(
+                doc.getString("nombre"),
+                aBigDecimal(doc.get("precio")),
+                doc.getInteger("cantidad", 0));
+        Integer numero = doc.getInteger("id");
+        if (numero != null) {
+            venta.setId(numero);
+        }
+        return venta;
+    }
+
+    private static BigDecimal aBigDecimal(Object valor) {
+        if (valor instanceof BigDecimal decimal) {
+            return decimal;
+        }
+        if (valor instanceof Decimal128 decimal128) {
+            return decimal128.bigDecimalValue();
+        }
+        if (valor instanceof Number numero) {
+            return BigDecimal.valueOf(numero.doubleValue());
+        }
+        return BigDecimal.ZERO;
     }
 
     //Mapea la venta a un Document de MongoDB para guardarlo en la coleccion ventas

@@ -1,0 +1,434 @@
+package com.ues.procesamiento_pago.view;
+
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.Insets;
+import java.awt.LayoutManager;
+import java.math.BigDecimal;
+import java.util.List;
+
+import javax.swing.BorderFactory;
+import javax.swing.JButton;
+import javax.swing.JComboBox;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTable;
+import javax.swing.JTextField;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
+
+import org.bson.Document;
+import org.bson.types.ObjectId;
+
+import com.ues.procesamiento_pago.Model.Venta;
+import com.ues.procesamiento_pago.Strategy.MetodoPago;
+import com.ues.procesamiento_pago.config.MongoDBConnection;
+import com.ues.procesamiento_pago.dao.VentaDAO;
+import com.ues.procesamiento_pago.util.Estilos;
+import com.ues.procesamiento_pago.view.components.TableVentasRegistradasModel;
+
+public class ModificacionVentasForm extends JFrame {
+    private static final String TODOS = "Todos";
+
+    private JTextField txtFiltroId;
+    private JComboBox<String> comboFiltroEstado;
+    private JComboBox<String> comboFiltroMetodo;
+    private JButton btnBuscar;
+    private JButton btnLimpiarFiltros;
+    private JButton btnGuardar;
+    private JLabel lblResumen;
+    private JTable tablaVentas;
+    private TableVentasRegistradasModel modeloTabla;
+
+    private JTextField txtIdVenta;
+    private JTextField txtNombre;
+    private JTextField txtPrecio;
+    private JTextField txtCantidad;
+    private JTextField txtTotal;
+    private JComboBox<String> comboEstado;
+    private JComboBox<String> comboMetodo;
+
+    // item de venta actualmente seleccionado en la tabla 
+    private Document ventaSeleccionada;
+
+    private final VentaDAO dao;
+
+    private static final String[] METODOS = {
+        "Efectivo", "Pago con tarjeta", "Pago Electronico", "Transferencia Bancaria"
+    };
+
+    private static final String[] ESTADOS = {"PENDIENTE", "PROCESADO", "RECHAZADO"};
+
+    private static final Color COLOR_FONDO = Color.DARK_GRAY;
+    private static final Color COLOR_TEXTO_SECUNDARIO = new Color(160, 160, 160);
+    private static final Color COLOR_VERDE = new Color(60, 220, 130);
+    private static final Color COLOR_ROJO = new Color(220, 60, 60);
+    private static final Font FUENTE_ETIQUETA = new Font("SansSerif", Font.BOLD, 12);
+    private static final Insets MARGEN = new Insets(3, 0, 3, 0);
+    private static final Insets SIN_MARGEN = new Insets(0, 0, 0, 0);
+
+    public ModificacionVentasForm(MongoDBConnection mongoDB) {
+        if (mongoDB != null && mongoDB.getDatabase() != null) {
+            this.dao = new VentaDAO(mongoDB);
+        } else {
+            this.dao = null;
+            JOptionPane.showMessageDialog(null, "No hay una conexión activa a MongoDB.");
+        }
+
+        setTitle("Modificación de ventas");
+        setSize(1180, 780);
+        setLocationRelativeTo(null);
+        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        setResizable(false);
+
+        add(crearContenido());
+        conectarEventos();
+
+        if (dao != null) {
+            buscar();
+        }
+    }
+
+    private JPanel crearContenido() {
+        JPanel panel = crearPanel(new GridBagLayout());
+        panel.setBorder(BorderFactory.createEmptyBorder(12, 18, 16, 18));
+
+        JLabel lblTitulo = new JLabel("MODIFICACIÓN DE VENTAS", JLabel.CENTER);
+        lblTitulo.setFont(new Font("SansSerif", Font.BOLD, 26));
+        lblTitulo.setForeground(Color.WHITE);
+
+        agregar(panel, lblTitulo, 0, 0, new Insets(0, 0, 10, 0));
+        agregar(panel, crearPanelFiltros(), 1, 0, MARGEN);
+        agregar(panel, crearPanelTabla(), 2, 1, SIN_MARGEN);
+        agregar(panel, crearPanelEdicion(), 3, 0, new Insets(10, 0, 4, 0));
+        agregar(panel, crearPanelBotones(), 4, 0, SIN_MARGEN);
+        return panel;
+    }
+
+    private JPanel crearPanelFiltros() {
+        JPanel panel = crearPanel(new FlowLayout(FlowLayout.LEFT, 10, 4));
+
+        txtFiltroId = campo();
+        txtFiltroId.setPreferredSize(new Dimension(90, 32));
+
+        comboFiltroEstado = combo(ESTADOS, true);
+        comboFiltroMetodo = combo(METODOS, true);
+        btnBuscar = boton("BUSCAR", COLOR_VERDE, Color.BLACK);
+        btnLimpiarFiltros = boton("LIMPIAR FILTROS", COLOR_ROJO, Color.WHITE);
+
+        panel.add(etiqueta("N° DE VENTA:"));
+        panel.add(txtFiltroId);
+        panel.add(etiqueta("ESTADO:"));
+        panel.add(comboFiltroEstado);
+        panel.add(etiqueta("MÉTODO DE PAGO:"));
+        panel.add(comboFiltroMetodo);
+        panel.add(btnBuscar);
+        panel.add(btnLimpiarFiltros);
+        return panel;
+    }
+
+    private JPanel crearPanelTabla() {
+        modeloTabla = new TableVentasRegistradasModel();
+        tablaVentas = new JTable(modeloTabla);
+        tablaVentas.setBackground(new Color(25, 25, 25));
+        tablaVentas.setForeground(Color.WHITE);
+        tablaVentas.setGridColor(new Color(60, 60, 60));
+        tablaVentas.setSelectionBackground(new Color(45, 120, 85));
+        tablaVentas.setSelectionForeground(Color.WHITE);
+        tablaVentas.setRowHeight(24);
+        tablaVentas.getTableHeader().setBackground(Color.BLACK);
+        tablaVentas.getTableHeader().setForeground(Color.WHITE);
+        tablaVentas.getTableHeader().setFont(FUENTE_ETIQUETA);
+        tablaVentas.setAutoCreateRowSorter(true);
+        tablaVentas.getColumnModel().getColumn(1).setPreferredWidth(200);
+
+        JPanel panel = crearPanel(new BorderLayout(0, 4));
+        panel.add(new JScrollPane(tablaVentas), BorderLayout.CENTER);
+
+        lblResumen = new JLabel(" ");
+        lblResumen.setForeground(COLOR_TEXTO_SECUNDARIO);
+        lblResumen.setFont(FUENTE_ETIQUETA);
+        panel.add(lblResumen, BorderLayout.SOUTH);
+        return panel;
+    }
+
+    private JPanel crearPanelEdicion() {
+        JPanel panel = crearPanel(new GridBagLayout());
+        panel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(70, 70, 70), 1),
+                BorderFactory.createEmptyBorder(8, 12, 8, 12)));
+
+        txtIdVenta = campo();
+        txtIdVenta.setEditable(false);
+        txtNombre = campo();
+        txtPrecio = campo();
+        txtCantidad = campo();
+        txtTotal = campo();
+        txtTotal.setEditable(false);
+        comboEstado = combo(ESTADOS, false);
+        comboMetodo = combo(METODOS, false);
+
+        agregarCampo(panel, "N° DE VENTA:", txtIdVenta, 0, 0);
+        agregarCampo(panel, "PRODUCTO:", txtNombre, 2, 0);
+        agregarCampo(panel, "PRECIO UNITARIO:", txtPrecio, 4, 0);
+        agregarCampo(panel, "CANTIDAD:", txtCantidad, 6, 0);
+        agregarCampo(panel, "TOTAL:", txtTotal, 0, 2);
+        agregarCampo(panel, "ESTADO:", comboEstado, 2, 2);
+        agregarCampo(panel, "MÉTODO DE PAGO:", comboMetodo, 4, 2);
+        return panel;
+    }
+
+    private JPanel crearPanelBotones() {
+        JPanel panel = crearPanel(new BorderLayout());
+        btnGuardar = boton("GUARDAR CAMBIOS", COLOR_VERDE, Color.BLACK);
+        JButton btnCancelar = boton("Cancelar", COLOR_ROJO, Color.WHITE);
+        btnCancelar.addActionListener(e -> dispose());
+        panel.add(btnGuardar, BorderLayout.WEST);
+        panel.add(btnCancelar, BorderLayout.EAST);
+        return panel;
+    }
+
+    private void conectarEventos() {
+        btnBuscar.addActionListener(e -> buscar());
+        btnLimpiarFiltros.addActionListener(e -> limpiarFiltros());
+        btnGuardar.addActionListener(e -> guardarCambios());
+        txtFiltroId.addActionListener(e -> buscar());
+
+        DocumentListener listenerCalculo = new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) { actualizarTotal(); }
+            @Override
+            public void removeUpdate(DocumentEvent e) { actualizarTotal(); }
+            @Override
+            public void changedUpdate(DocumentEvent e) { actualizarTotal(); }
+        };
+        txtPrecio.getDocument().addDocumentListener(listenerCalculo);
+        txtCantidad.getDocument().addDocumentListener(listenerCalculo);
+
+        tablaVentas.getSelectionModel().addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting() && tablaVentas.getSelectedRow() != -1) {
+                int fila = tablaVentas.convertRowIndexToModel(tablaVentas.getSelectedRow());
+                if (fila < 0 || fila >= modeloTabla.getRowCount()) {
+                    return;
+                }
+                ventaSeleccionada = modeloTabla.getVentaAt(fila);
+                mostrarVenta(ventaSeleccionada);
+            }
+        });
+    }
+
+    private void buscar() {
+        if (dao == null) {
+            JOptionPane.showMessageDialog(this, "No hay conexión con la base de datos.", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        Integer numeroVenta = null;
+        String textoId = txtFiltroId.getText().trim();
+        if (!textoId.isEmpty()) {
+            try {
+                numeroVenta = Integer.valueOf(textoId);
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(this, "El número de venta debe ser numérico.", "Error de formato", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+        }
+
+        String estado = valorFiltro(comboFiltroEstado);
+        String metodo = valorFiltro(comboFiltroMetodo);
+
+        List<Document> ventas = dao.listar(numeroVenta, estado, metodo);
+        modeloTabla.setVentas(ventas);
+        limpiarSeleccion();
+        lblResumen.setText(ventas.isEmpty()
+                ? "No se encontraron ventas con esos filtros."
+                : ventas.size() + " item(s) de venta encontrados (seleccione una fila para editarla).");
+    }
+
+    private void limpiarFiltros() {
+        txtFiltroId.setText("");
+        comboFiltroEstado.setSelectedIndex(0);
+        comboFiltroMetodo.setSelectedIndex(0);
+        buscar();
+    }
+
+    private void mostrarVenta(Document documento) {
+        Venta venta = Venta.fromDocument(documento);
+        txtIdVenta.setText(documento.getInteger("id") == null ? "-" : String.valueOf(documento.getInteger("id")));
+        txtNombre.setText(venta.getNombre());
+        txtPrecio.setText(venta.getPrecio().toPlainString());
+        txtCantidad.setText(String.valueOf(venta.getCantidad()));
+        txtTotal.setText("$" + MetodoPago.formatear(venta.getTotal()));
+        seleccionar(comboEstado, documento.getString("estado"));
+        seleccionar(comboMetodo, documento.getString("metodoPago"));
+    }
+
+    private void guardarCambios() {
+        if (ventaSeleccionada == null) {
+            JOptionPane.showMessageDialog(this, "Seleccione una venta de la tabla para modificarla.", "Advertencia", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        if (dao == null) {
+            JOptionPane.showMessageDialog(this, "No hay conexión con la base de datos.", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        String nombre = txtNombre.getText().trim();
+        String precioStr = txtPrecio.getText().trim();
+        String cantidadStr = txtCantidad.getText().trim();
+        if (nombre.isEmpty() || precioStr.isEmpty() || cantidadStr.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Por favor, complete todos los campos.", "Advertencia", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        BigDecimal precio;
+        int cantidad;
+        try {
+            precio = new BigDecimal(precioStr);
+            cantidad = Integer.parseInt(cantidadStr);
+        } catch (NumberFormatException ex) {
+            JOptionPane.showMessageDialog(this, "El precio y la cantidad deben ser valores numéricos válidos.", "Error de formato", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        if (precio.signum() < 0 || cantidad <= 0) {
+            JOptionPane.showMessageDialog(this, "El precio no puede ser negativo y la cantidad debe ser mayor que cero.", "Advertencia", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        ObjectId id = ventaSeleccionada.getObjectId("_id");
+        Venta venta = new Venta(nombre, precio, cantidad);
+        boolean actualizado = dao.actualizar(id, venta,
+                (String) comboEstado.getSelectedItem(), (String) comboMetodo.getSelectedItem());
+
+        if (!actualizado) {
+            JOptionPane.showMessageDialog(this, "No se pudo actualizar la venta seleccionada.", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        JOptionPane.showMessageDialog(this, "Venta modificada correctamente.", "Venta actualizada", JOptionPane.INFORMATION_MESSAGE);
+        buscar();
+    }
+
+    private void actualizarTotal() {
+        try {
+            BigDecimal precio = new BigDecimal(txtPrecio.getText().trim());
+            int cantidad = Integer.parseInt(txtCantidad.getText().trim());
+            txtTotal.setText(cantidad <= 0 ? "" : "$" + MetodoPago.formatear(precio.multiply(BigDecimal.valueOf(cantidad))));
+        } catch (NumberFormatException e) {
+            txtTotal.setText("");
+        }
+    }
+
+    private void limpiarSeleccion() {
+        ventaSeleccionada = null;
+        tablaVentas.clearSelection();
+        txtIdVenta.setText("");
+        txtNombre.setText("");
+        txtPrecio.setText("");
+        txtCantidad.setText("");
+        txtTotal.setText("");
+        comboEstado.setSelectedIndex(0);
+        comboMetodo.setSelectedIndex(0);
+    }
+
+    private String valorFiltro(JComboBox<String> combo) {
+        String valor = (String) combo.getSelectedItem();
+        return valor == null || TODOS.equals(valor) ? null : valor;
+    }
+
+    private static void seleccionar(JComboBox<String> combo, String valor) {
+        if (valor == null) {
+            combo.setSelectedIndex(0);
+            return;
+        }
+        for (int i = 0; i < combo.getItemCount(); i++) {
+            if (valor.equals(combo.getItemAt(i))) {
+                combo.setSelectedIndex(i);
+                return;
+            }
+        }
+        combo.setSelectedIndex(0);
+    }
+
+    private static void agregar(JPanel panel, Component comp, int fila, double pesoVertical, Insets margen) {
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.gridx = 0;
+        gbc.gridy = fila;
+        gbc.weightx = 1.0;
+        gbc.weighty = pesoVertical;
+        gbc.fill = pesoVertical > 0 ? GridBagConstraints.BOTH : GridBagConstraints.HORIZONTAL;
+        gbc.insets = margen;
+        panel.add(comp, gbc);
+    }
+
+    private static void agregarCampo(JPanel panel, String texto, Component comp, int columna, int fila) {
+        GridBagConstraints gbcEtiqueta = new GridBagConstraints();
+        gbcEtiqueta.gridx = columna;
+        gbcEtiqueta.gridy = fila;
+        gbcEtiqueta.weightx = 0.0;
+        gbcEtiqueta.fill = GridBagConstraints.HORIZONTAL;
+        gbcEtiqueta.insets = new Insets(4, 0, 0, 8);
+        panel.add(etiqueta(texto), gbcEtiqueta);
+
+        GridBagConstraints gbcCampo = new GridBagConstraints();
+        gbcCampo.gridx = columna + 1;
+        gbcCampo.gridy = fila + 1;
+        gbcCampo.weightx = 0.25;
+        gbcCampo.fill = GridBagConstraints.HORIZONTAL;
+        gbcCampo.insets = new Insets(0, 0, 4, 8);
+        panel.add(comp, gbcCampo);
+    }
+
+    private static JPanel crearPanel(LayoutManager layout) {
+        JPanel panel = new JPanel(layout);
+        panel.setBackground(COLOR_FONDO);
+        return panel;
+    }
+
+    private static JLabel etiqueta(String texto) {
+        JLabel etiqueta = new JLabel(texto);
+        etiqueta.setForeground(COLOR_TEXTO_SECUNDARIO);
+        etiqueta.setFont(FUENTE_ETIQUETA);
+        return etiqueta;
+    }
+
+    private static JTextField campo() {
+        JTextField campo = new JTextField();
+        Estilos.estilarCampo(campo);
+        return campo;
+    }
+
+    private static JComboBox<String> combo(String[] valores, boolean incluirTodos) {
+        String[] items;
+        if (incluirTodos) {
+            items = new String[valores.length + 1];
+            items[0] = TODOS;
+            System.arraycopy(valores, 0, items, 1, valores.length);
+        } else {
+            items = valores;
+        }
+        JComboBox<String> combo = new JComboBox<>(items);
+        combo.setPreferredSize(new Dimension(incluirTodos ? 160 : 150, 32));
+        combo.setBackground(Color.WHITE);
+        combo.setForeground(Color.BLACK);
+        combo.setFont(FUENTE_ETIQUETA);
+        return combo;
+    }
+
+    private static JButton boton(String texto, Color fondo, Color colorTexto) {
+        JButton boton = new JButton(texto);
+        boton.setBackground(fondo);
+        boton.setForeground(colorTexto);
+        boton.setFont(FUENTE_ETIQUETA);
+        return boton;
+    }
+}
