@@ -30,12 +30,14 @@ import javax.swing.JTextField;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
+import com.mongodb.MongoException;
 import com.ues.procesamiento_pago.Model.EstadoPago;
 import com.ues.procesamiento_pago.Model.Transaccion;
 import com.ues.procesamiento_pago.Model.Venta;
 import com.ues.procesamiento_pago.Strategy.IMetodoPago;
 import com.ues.procesamiento_pago.Strategy.MetodoPago;
 import com.ues.procesamiento_pago.config.MongoDBConnection;
+import com.ues.procesamiento_pago.dao.TransaccionDAO;
 import com.ues.procesamiento_pago.dao.VentaDAO;
 import com.ues.procesamiento_pago.util.Estilos;
 import com.ues.procesamiento_pago.view.components.TableVentasModel;
@@ -62,6 +64,7 @@ public class VentasForm extends JFrame {
 
     private final String usuario;
     private final VentaDAO dao;
+    private final TransaccionDAO transaccionDAO;
     private final List<Venta> ventasPendientes = new ArrayList<>();
 
     private final String[] METODOS = {
@@ -91,6 +94,7 @@ public class VentasForm extends JFrame {
             this.dao = null;
             JOptionPane.showMessageDialog(null, "No hay una conexión activa a MongoDB.");
         }
+        this.transaccionDAO = dao != null ? new TransaccionDAO(mongoDB) : null;
         this.numeroVentaActual = dao != null ? dao.siguienteNumeroVenta() : 1;
 
         setTitle("Ingreso de ventas");
@@ -234,7 +238,7 @@ public class VentasForm extends JFrame {
                 int fila = tablaVentas.getSelectedRow();
                 indiceFilaSeleccionada = fila;
                 
-                // recuperamos la venta desde el modelo de la tabla
+                // recuperar la venta desde el modelo de la tabla
                 Venta v = modeloTabla.getVentaAt(fila);
                 
                 txtItem.setText(String.valueOf(fila + 1));
@@ -296,12 +300,12 @@ public class VentasForm extends JFrame {
 
         int numeroRegistrado = numeroVentaActual;
         String metodoNombre = (String) comboMetodos.getSelectedItem();
-        IMetodoPago metodoPago = pedirMetodoPago(totalVenta());
+        BigDecimal totalRegistrado = totalVenta();
+        IMetodoPago metodoPago = pedirMetodoPago(totalRegistrado);
 
-        EstadoPago estado;
-        Transaccion transaccion = null;
+        Transaccion transaccion;
         if (metodoPago == null) {
-            //si no se capturaron los datos del pago,la venta puede guardarse como pendiente
+            // no se capturaron los datos del pago, la venta puede guardarse como pendiente
             int opcion = JOptionPane.showConfirmDialog(this,
                     "No se completaron los datos del método de pago.\n¿Desea guardar la venta N° "
                             + numeroRegistrado + " con estado PENDIENTE?",
@@ -309,33 +313,35 @@ public class VentasForm extends JFrame {
             if (opcion != JOptionPane.YES_OPTION) {
                 return;
             }
-            estado = EstadoPago.PENDIENTE;
+            transaccion = new Transaccion(numeroRegistrado, metodoNombre, totalRegistrado, EstadoPago.PENDIENTE);
+            transaccion.setMensaje("Los datos del método de pago no fueron capturados.");
         } else {
-            Venta resumen = new Venta("Venta de " + ventasPendientes.size() + " producto(s)", totalVenta(), 1);
+            Venta resumen = new Venta("Venta de " + ventasPendientes.size() + " producto(s)", totalRegistrado, 1);
             resumen.setId(numeroRegistrado);
             transaccion = metodoPago.procesar(resumen);
-            estado = transaccion.getEstado();
+            transaccion.setMensaje(metodoPago.getMensajeError());
         }
 
-        if (dao == null) {
+        // estado que resulto de la validacion del pago: PROCESADO, RECHAZADO o PENDIENTE
+        EstadoPago estado = transaccion.getEstado();
+
+        if (dao == null || transaccionDAO == null) {
             JOptionPane.showMessageDialog(this, "No hay conexión con la base de datos: la venta no se guardó.",
                     "Error", JOptionPane.ERROR_MESSAGE);
             return;
         }
 
-        // la venta se guarda siempre, con el estado que resulto de la validacion:
-        // PROCESADO, RECHAZADO (datos invalidos) o PENDIENTE (datos no capturados)
-        for (Venta item : ventasPendientes) {
-            item.setId(numeroRegistrado);
-            dao.insertar(item, estado, metodoNombre, usuario);
+        
+        if (!guardarVenta(numeroRegistrado, estado, metodoNombre, transaccion)) {
+            return;
         }
         numeroVentaActual = dao.siguienteNumeroVenta();
         txtNumeroVenta.setText(String.valueOf(numeroVentaActual));
 
-        if (estado == EstadoPago.PROCESADO && metodoPago != null && transaccion != null) {
+        if (estado == EstadoPago.PROCESADO && metodoPago != null) {
             JOptionPane.showMessageDialog(this, metodoPago.comprobante(transaccion), "Venta registrada", JOptionPane.INFORMATION_MESSAGE);
         } else {
-            String motivo = metodoPago != null ? metodoPago.getMensajeError() : null;
+            String motivo = transaccion.getMensaje();
             JOptionPane.showMessageDialog(this,
                     "La venta N° " + numeroRegistrado + " se guardó con estado " + estado + ".\n"
                             + (motivo != null ? motivo : "Pago no confirmado."),
@@ -348,6 +354,22 @@ public class VentasForm extends JFrame {
         txtTotalVenta.setText("$0.00");
         
         txtNombre.requestFocusInWindow();
+    }
+
+    // guarda los items de la venta y su transaccion de pago principal
+    private boolean guardarVenta(int numeroVenta, EstadoPago estado, String metodo, Transaccion transaccion) {
+        try {
+            for (Venta item : ventasPendientes) {
+                item.setId(numeroVenta);
+                dao.insertar(item, estado, metodo, usuario);
+            }
+            transaccionDAO.insertar(transaccion);
+            return true;
+        } catch (MongoException ex) {
+            JOptionPane.showMessageDialog(this, "Error al guardar en la base de datos: " + ex.getMessage(),
+                    "Error de conexión", JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
     }
 
     private BigDecimal totalVenta() {

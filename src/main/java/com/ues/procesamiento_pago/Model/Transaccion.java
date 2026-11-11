@@ -1,28 +1,34 @@
-
 package com.ues.procesamiento_pago.Model;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.util.Date;
 
+import org.bson.Document;
+import org.bson.types.ObjectId;
 
 public class Transaccion {
-    private int id;
-    private int idVenta;
-    private String metodo;
-    private BigDecimal monto;
-    private LocalDateTime fecha;
-    private EstadoPago estado;
+    private ObjectId id;
+    private final int idVenta;
+    private final String metodo;
+    private final BigDecimal monto;
+    private final Date fecha;
+    private final EstadoPago estado;
+    private String mensaje;
 
     public Transaccion(int idVenta, String metodo, BigDecimal monto, EstadoPago estado) {
         this.idVenta = idVenta;
         this.metodo = metodo;
         this.monto = monto;
-        this.fecha = LocalDateTime.now();
+        this.fecha = new Date();
         this.estado = estado;
     }
 
-    public int getId() {
+    public ObjectId getId() {
         return id;
+    }
+
+    public void setId(ObjectId id) {
+        this.id = id;
     }
 
     public int getIdVenta() {
@@ -37,11 +43,31 @@ public class Transaccion {
         return monto;
     }
 
-    public LocalDateTime getFehca() {
+    public Date getFecha() {
         return fecha;
     }
 
     public EstadoPago getEstado() {
         return estado;
+    }
+
+    public String getMensaje() {
+        return mensaje;
+    }
+
+    public void setMensaje(String mensaje) {
+        this.mensaje = mensaje;
+    }
+
+    public Document toDocument() {
+        Document documento = new Document("idVenta", idVenta)
+                .append("metodo", metodo)
+                .append("monto", monto)
+                .append("fecha", fecha)
+                .append("estado", estado == null ? null : estado.name());
+        if (mensaje != null) {
+            documento.append("mensaje", mensaje);
+        }
+        return documento;
     }
 }
