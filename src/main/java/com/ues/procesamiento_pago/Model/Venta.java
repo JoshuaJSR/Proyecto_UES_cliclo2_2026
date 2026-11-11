@@ -23,7 +23,7 @@ public class Venta {
     
     //calcular total
     public BigDecimal calcularTotal(int cantidad, BigDecimal precio){
-       return precio.multiply(BigDecimal.valueOf(cantidad));
+        return precio.multiply(BigDecimal.valueOf(cantidad));
     }
 
     public int getId() {
@@ -51,11 +51,14 @@ public class Venta {
     }
 
     //Mapea la venta a un Document de MongoDB para guardarlo en la coleccion ventas
-    public Document toDocument() {
+    public Document toDocument(EstadoPago estado, String metodoPago, String usuario) {
         return new Document("nombre", nombre)
                 .append("precio", precio)
                 .append("cantidad", cantidad)
                 .append("total", total)
-                .append("fecha", fecha);
+                .append("estado", estado.name())
+                .append("fecha", fecha)
+                .append("metodoPago", metodoPago)
+                .append("usuario", usuario);
     }
 }

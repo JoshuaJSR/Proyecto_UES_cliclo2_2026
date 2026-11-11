@@ -1,9 +1,9 @@
 package com.ues.procesamiento_pago.view;
 
-import com.ues.procesamiento_pago.config.MongoDBConnection;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Font;
+
 import javax.swing.BorderFactory;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -13,6 +13,8 @@ import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.SwingConstants;
+
+import com.ues.procesamiento_pago.config.MongoDBConnection;
 
 public class MainForm extends JFrame {
     private MongoDBConnection mongoDB;
@@ -96,7 +98,7 @@ public class MainForm extends JFrame {
         });
 
         itemIngresoVentas.addActionListener(e -> {
-            new VentasForm(this.mongoDB).setVisible(true);
+            new VentasForm(this.mongoDB, this.nombreUsuario).setVisible(true);
         });
 
         itemConsultarVentas.addActionListener(e -> {

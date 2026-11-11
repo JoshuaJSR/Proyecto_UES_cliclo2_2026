@@ -1,14 +1,19 @@
 package com.ues.procesamiento_pago.view;
 
+import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Component;
 import java.awt.Dimension;
+import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
+import java.awt.LayoutManager;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
@@ -22,12 +27,16 @@ import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
-import javax.swing.table.DefaultTableModel;
 
+import com.ues.procesamiento_pago.Model.EstadoPago;
+import com.ues.procesamiento_pago.Model.Transaccion;
 import com.ues.procesamiento_pago.Model.Venta;
+import com.ues.procesamiento_pago.Strategy.IMetodoPago;
+import com.ues.procesamiento_pago.Strategy.MetodoPago;
 import com.ues.procesamiento_pago.config.MongoDBConnection;
 import com.ues.procesamiento_pago.dao.VentaDAO;
 import com.ues.procesamiento_pago.util.Estilos;
+import com.ues.procesamiento_pago.view.components.TableVentasModel;
 
 public class VentasForm extends JFrame {
     private JTextField txtNombre;
@@ -38,198 +47,125 @@ public class VentasForm extends JFrame {
     private JComboBox<String> comboMetodos;
     private JButton btnAgregar;
     private JButton btnGuardar;
-    private JTable tablaVentas;
-    private DefaultTableModel modeloTabla;
-    
-    private MongoDBConnection mongoDB;
-    private VentaDAO dao;
-    
+    private TableVentasModel modeloTabla;
+
+    private final String usuario;
+    private final VentaDAO dao;
     private final List<Venta> ventasPendientes = new ArrayList<>();
-    
-    private Venta ventaItemActual;
-    
+
     private final String[] METODOS = {
         "Efectivo", "Pago con tarjeta", "Pago Electronico", "Transferencia Bancaria"
     };
-    
+
+    private static final Map<String, String[]> DATOS_POR_METODO = Map.of(
+        "Pago con tarjeta", new String[]{"Número de la tarjeta:", "Nombre del titular:"},
+        "Pago Electronico", new String[]{"Correo de la cuenta:", "Plataforma de pago:"},
+        "Transferencia Bancaria", new String[]{"Número de cuenta origen:", "Número de cuenta destino:"}
+    );
+
     private static final Color COLOR_FONDO = Color.DARK_GRAY;
-    private static final Color COLOR_BORDE_CAMPO = new Color(60, 60, 60);
     private static final Color COLOR_TEXTO_SECUNDARIO = new Color(160, 160, 160);
     private static final Color COLOR_VERDE = new Color(60, 220, 130);
+    private static final Color COLOR_ROJO = new Color(220, 60, 60);
+    private static final Font FUENTE_ETIQUETA = new Font("SansSerif", Font.BOLD, 12);
+    private static final Font FUENTE_DESTACADA = new Font("SansSerif", Font.BOLD, 14);
+    private static final Insets MARGEN = new Insets(3, 0, 3, 0);
+    private static final Insets SIN_MARGEN = new Insets(0, 0, 0, 0);
 
-    public VentasForm(MongoDBConnection mongoDB){
-        this.mongoDB = mongoDB;
-
-        if (this.mongoDB != null && this.mongoDB.getDatabase() != null) {
-            this.dao = new VentaDAO(this.mongoDB);
+    public VentasForm(MongoDBConnection mongoDB, String usuario) {
+        this.usuario = usuario;
+        if (mongoDB != null && mongoDB.getDatabase() != null) {
+            this.dao = new VentaDAO(mongoDB);
         } else {
+            this.dao = null;
             JOptionPane.showMessageDialog(this, "No hay una conexión activa a MongoDB.");
         }
-        
+
         setTitle("Ingreso de ventas");
         setSize(1080, 740);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setResizable(false);
-        
-        JPanel panel = new JPanel(new GridBagLayout());
-        panel.setBackground(COLOR_FONDO);
+
+        add(crearContenido());
+        conectarEventos();
+    }
+
+    private JPanel crearContenido() {
+        JPanel panel = crearPanel(new GridBagLayout());
         panel.setBorder(BorderFactory.createEmptyBorder(12, 18, 16, 18));
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.gridx = 0;
-        gbc.weightx = 1.0;
-        gbc.insets = new Insets(3, 0, 3, 0);
-        
+
         JLabel lblTitulo = new JLabel("PUNTO DE VENTA", JLabel.CENTER);
         lblTitulo.setFont(new Font("SansSerif", Font.BOLD, 26));
         lblTitulo.setForeground(Color.WHITE);
-        gbc.gridy = 0;
-        gbc.insets = new Insets(0, 0, 10, 0);
-        panel.add(lblTitulo, gbc);
-        gbc.insets = new Insets(3, 0, 3, 0);
-        
-        gbc.gridy = 1;
-        JLabel lblNombre = new JLabel("Nombre del producto");
-        lblNombre.setForeground(COLOR_TEXTO_SECUNDARIO);
-        lblNombre.setFont(new Font("SansSerif", Font.BOLD, 12));
-        panel.add(lblNombre, gbc);
-        
-        gbc.gridy = 2;
-        txtNombre = new JTextField();
-        Estilos.estilarCampo(txtNombre); 
-        panel.add(txtNombre, gbc);
-        
-        gbc.gridy = 3;
-        JPanel panelCamposMedios = new JPanel(new GridBagLayout());
-        panelCamposMedios.setBackground(COLOR_FONDO);
-        GridBagConstraints gbcMedios = new GridBagConstraints();
-        gbcMedios.fill = GridBagConstraints.HORIZONTAL;
-        gbcMedios.weightx = 0.33;
-        gbcMedios.insets = new Insets(0, 0, 0, 10);
 
-        gbcMedios.gridx = 0;
-        gbcMedios.gridy = 0;
-        JLabel lblPrecio = new JLabel("PRECIO");
-        lblPrecio.setForeground(COLOR_TEXTO_SECUNDARIO);
-        lblPrecio.setFont(new Font("SansSerif", Font.BOLD, 12));
-        panelCamposMedios.add(lblPrecio, gbcMedios);
+        txtNombre = campo();
+        btnAgregar = boton("AGREGAR PRODUCTO", COLOR_VERDE, Color.BLACK);
 
-        gbcMedios.gridx = 1;
-        JLabel lblCantidad = new JLabel("CANTIDAD");
-        lblCantidad.setForeground(COLOR_TEXTO_SECUNDARIO);
-        lblCantidad.setFont(new Font("SansSerif", Font.BOLD, 12));
-        panelCamposMedios.add(lblCantidad, gbcMedios);
-
-        gbcMedios.gridx = 2;
-        gbcMedios.insets = new Insets(0, 0, 0, 0);
-        JLabel lblTotal = new JLabel("TOTAL");
-        lblTotal.setForeground(COLOR_TEXTO_SECUNDARIO);
-        lblTotal.setFont(new Font("SansSerif", Font.BOLD, 12));
-        panelCamposMedios.add(lblTotal, gbcMedios);
-
-        gbcMedios.gridy = 1;
-        gbcMedios.insets = new Insets(3, 0, 0, 10);
-        
-        gbcMedios.gridx = 0;
-        txtPrecio = new JTextField();
-        Estilos.estilarCampo(txtPrecio);
-        panelCamposMedios.add(txtPrecio, gbcMedios);
-
-        gbcMedios.gridx = 1;
-        txtCantidad = new JTextField();
-        Estilos.estilarCampo(txtCantidad);
-        panelCamposMedios.add(txtCantidad, gbcMedios);
-
-        gbcMedios.gridx = 2;
-        gbcMedios.insets = new Insets(3, 0, 0, 0);
-        txtTotal = new JTextField();
-        Estilos.estilarCampo(txtTotal);
-        txtTotal.setEditable(false);
-        panelCamposMedios.add(txtTotal, gbcMedios);
-
-        panel.add(panelCamposMedios, gbc);
-
-        gbc.gridy = 4;
-        gbc.insets = new Insets(10, 0, 10, 0);
-        btnAgregar = new JButton("AGREGAR PRODUCTO");
-        btnAgregar.setBackground(COLOR_VERDE);
-        btnAgregar.setForeground(Color.BLACK);
-        btnAgregar.setFont(new Font("SansSerif", Font.BOLD, 12));
-        panel.add(btnAgregar, gbc);
-
-        gbc.gridy = 5;
-        gbc.weighty = 1.0;
-        gbc.fill = GridBagConstraints.BOTH;
-        gbc.insets = new Insets(0, 0, 0, 0);
-        String[] columnas = {"ITEM", "NOMBRE", "PRECIO", "CANTIDAD", "TOTAL"};
-        modeloTabla = new DefaultTableModel(columnas, 0);
-        tablaVentas = new JTable(modeloTabla);
+        modeloTabla = new TableVentasModel(ventasPendientes);
+        JTable tablaVentas = new JTable(modeloTabla);
         tablaVentas.setPreferredScrollableViewportSize(new Dimension(450, 120));
-        JScrollPane scrollPane = new JScrollPane(tablaVentas);
-        panel.add(scrollPane, gbc);
 
-        // Panel Total de la Venta (Corregido con ancho explícito en panel secundario)
-        gbc.gridy = 6;
-        gbc.weighty = 0.0;
-        gbc.fill = GridBagConstraints.NONE;
-        gbc.anchor = GridBagConstraints.EAST;
-        gbc.insets = new Insets(8, 0, 8, 0);
-        
-        JPanel panelTotalVenta = new JPanel(new GridBagLayout());
-        panelTotalVenta.setBackground(COLOR_FONDO);
-        GridBagConstraints gbcTotal = new GridBagConstraints();
-        gbcTotal.gridy = 0;
-        
-        gbcTotal.gridx = 0;
-        gbcTotal.insets = new Insets(0, 0, 0, 10);
-        JLabel lblTotalVenta = new JLabel("TOTAL DE LA VENTA:");
-        lblTotalVenta.setForeground(Color.WHITE);
-        lblTotalVenta.setFont(new Font("SansSerif", Font.BOLD, 14));
-        panelTotalVenta.add(lblTotalVenta, gbcTotal);
+        agregar(panel, lblTitulo, 0, 0, new Insets(0, 0, 10, 0));
+        agregar(panel, etiqueta("Nombre del producto"), 1, 0, MARGEN);
+        agregar(panel, txtNombre, 2, 0, MARGEN);
+        agregar(panel, crearPanelCamposMedios(), 3, 0, MARGEN);
+        agregar(panel, btnAgregar, 4, 0, new Insets(10, 0, 10, 0));
+        agregar(panel, new JScrollPane(tablaVentas), 5, 1, SIN_MARGEN);
+        agregar(panel, crearPanelTotal(), 6, 0, new Insets(8, 0, 8, 0));
+        agregar(panel, crearPanelPago(), 7, 0, SIN_MARGEN);
+        agregar(panel, crearPanelBotones(), 8, 0, SIN_MARGEN);
+        return panel;
+    }
 
-        gbcTotal.gridx = 1;
-        gbcTotal.insets = new Insets(0, 0, 0, 0);
-        txtTotalVenta = new JTextField();
-        Estilos.estilarCampo(txtTotalVenta, 160);
+    private JPanel crearPanelCamposMedios() {
+        JPanel panel = crearPanel(new GridBagLayout());
+        String[] titulos = {"PRECIO", "CANTIDAD", "TOTAL"};
+        JTextField[] campos = {txtPrecio = campo(), txtCantidad = campo(), txtTotal = campo()};
+        campos[2].setEditable(false);
+
+        for (int i = 0; i < titulos.length; i++) {
+            Insets margen = new Insets(0, 0, 0, i < titulos.length - 1 ? 10 : 0);
+            panel.add(etiqueta(titulos[i]), posicion(i, 0, margen));
+            panel.add(campos[i], posicion(i, 1, margen));
+        }
+        return panel;
+    }
+
+    private JPanel crearPanelTotal() {
+        JPanel panel = crearPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        txtTotalVenta = campo();
+        txtTotalVenta.setPreferredSize(new Dimension(160, 35));
         txtTotalVenta.setEditable(false);
         txtTotalVenta.setText("$0.00");
-        panelTotalVenta.add(txtTotalVenta, gbcTotal);
+        panel.add(etiquetaDestacada("TOTAL DE LA VENTA:"));
+        panel.add(txtTotalVenta);
+        return panel;
+    }
 
-        panel.add(panelTotalVenta, gbc);
+    private JPanel crearPanelPago() {
+        JPanel panel = crearPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        comboMetodos = new JComboBox<>(METODOS);
+        comboMetodos.setPreferredSize(new Dimension(200, 30));
+        comboMetodos.setBackground(Color.WHITE);
+        comboMetodos.setForeground(Color.BLACK);
+        comboMetodos.setFont(FUENTE_ETIQUETA);
+        panel.add(etiquetaDestacada("MÉTODO DE PAGO:"));
+        panel.add(comboMetodos);
+        return panel;
+    }
 
-        // Panel Botones Inferiores
-        gbc.gridy = 7;
-        gbc.weighty = 0.0;
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.anchor = GridBagConstraints.CENTER;
-        gbc.insets = new Insets(0, 0, 0, 0);
-        
-        JPanel panelBotones = new JPanel(new GridBagLayout());
-        panelBotones.setBackground(COLOR_FONDO);
-        GridBagConstraints gbcBotones = new GridBagConstraints();
-        gbcBotones.gridy = 0;
+    private JPanel crearPanelBotones() {
+        JPanel panel = crearPanel(new BorderLayout());
+        btnGuardar = boton("Registrar Venta", COLOR_VERDE, Color.BLACK);
+        JButton btnCancelar = boton("Cancelar", COLOR_ROJO, Color.WHITE);
+        btnCancelar.addActionListener(e -> dispose());
+        panel.add(btnGuardar, BorderLayout.WEST);
+        panel.add(btnCancelar, BorderLayout.EAST);
+        return panel;
+    }
 
-        btnGuardar = new JButton("Registrar Venta");
-        btnGuardar.setBackground(COLOR_VERDE);
-        btnGuardar.setForeground(Color.BLACK);
-        btnGuardar.setFont(new Font("SansSerif", Font.BOLD, 12));
-        gbcBotones.gridx = 0;
-        gbcBotones.anchor = GridBagConstraints.WEST;
-        panelBotones.add(btnGuardar, gbcBotones);
-
-        JButton btnCancelar = new JButton("Cancelar");
-        btnCancelar.setBackground(new Color(220, 60, 60));
-        btnCancelar.setForeground(Color.WHITE);
-        btnCancelar.setFont(new Font("SansSerif", Font.BOLD, 12));
-        gbcBotones.gridx = 1;
-        gbcBotones.anchor = GridBagConstraints.EAST;
-        gbcBotones.weightx = 1.0;
-        panelBotones.add(btnCancelar, gbcBotones);
-
-        panel.add(panelBotones, gbc);
-        add(panel);    
-
+    private void conectarEventos() {
         DocumentListener listenerCalculo = new DocumentListener() {
             @Override
             public void insertUpdate(DocumentEvent e) { actualizarTotal(); }
@@ -238,74 +174,177 @@ public class VentasForm extends JFrame {
             @Override
             public void changedUpdate(DocumentEvent e) { actualizarTotal(); }
         };
-
         txtPrecio.getDocument().addDocumentListener(listenerCalculo);
         txtCantidad.getDocument().addDocumentListener(listenerCalculo);
+        btnGuardar.addActionListener(e -> registrarVenta());
+        btnAgregar.addActionListener(e -> agregarProducto());
+    }
 
-        btnCancelar.addActionListener(e -> dispose());
-        btnAgregar.addActionListener(e -> {
-            String nombre = txtNombre.getText().trim();
-            String precioStr = txtPrecio.getText().trim();
-            String cantidadStr = txtCantidad.getText().trim();
+    private void agregarProducto() {
+        String nombre = txtNombre.getText().trim();
+        String precioStr = txtPrecio.getText().trim();
+        String cantidadStr = txtCantidad.getText().trim();
 
-            if (nombre.isEmpty() || precioStr.isEmpty() || cantidadStr.isEmpty()) {
-                JOptionPane.showMessageDialog(this, "Por favor, complete todos los campos.", "Advertencia", JOptionPane.WARNING_MESSAGE);
-                return;
+        if (nombre.isEmpty() || precioStr.isEmpty() || cantidadStr.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Por favor, complete todos los campos.", "Advertencia", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        try {
+            modeloTabla.agregar(new Venta(nombre, new BigDecimal(precioStr), Integer.parseInt(cantidadStr)));
+            txtNombre.setText("");
+            txtPrecio.setText("");
+            txtCantidad.setText("");
+            txtTotal.setText("");
+            txtNombre.requestFocus();
+            txtTotalVenta.setText("$" + MetodoPago.formatear(totalVenta()));
+        } catch (NumberFormatException ex) {
+            JOptionPane.showMessageDialog(this, "El precio y la cantidad deben ser valores numéricos válidos.", "Error de formato", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void registrarVenta() {
+        if (ventasPendientes.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Agregue al menos un producto antes de registrar la venta.", "Advertencia", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        IMetodoPago metodoPago = pedirMetodoPago(totalVenta());
+        if (metodoPago == null) {
+            return;
+        }
+
+        Venta venta = new Venta("Venta de " + ventasPendientes.size() + " producto(s)", totalVenta(), 1);
+        Transaccion transaccion = metodoPago.procesar(venta);
+        if (transaccion.getEstado() != EstadoPago.PROCESADO) {
+            String motivo = metodoPago.getMensajeError();
+            JOptionPane.showMessageDialog(this,
+                    motivo != null ? motivo : "El pago fue rechazado.",
+                    "Pago rechazado", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        if (dao != null) {
+            for (Venta item : ventasPendientes) {
+                dao.insertar(item, transaccion.getEstado(), transaccion.getMetodo(), usuario);
             }
+        }
 
+        JOptionPane.showMessageDialog(this, metodoPago.comprobante(transaccion), "Venta registrada", JOptionPane.INFORMATION_MESSAGE);
+        modeloTabla.limpiar();
+        txtTotalVenta.setText("$0.00");
+    }
+
+    private BigDecimal totalVenta() {
+        BigDecimal total = BigDecimal.ZERO;
+        for (Venta venta : ventasPendientes) {
+            total = total.add(venta.getTotal());
+        }
+        return total;
+    }
+
+    private IMetodoPago pedirMetodoPago(BigDecimal total) {
+        String metodo = (String) comboMetodos.getSelectedItem();
+        if (metodo == null) {
+            return null;
+        }
+        if ("Efectivo".equals(metodo)) {
+            BigDecimal recibido = pedirMonto("Monto entregado por el cliente:", total);
+            return recibido == null ? null : MetodoPago.crear(metodo, recibido);
+        }
+
+        String[] preguntas = DATOS_POR_METODO.get(metodo);
+        String[] datos = new String[preguntas.length];
+        for (int i = 0; i < preguntas.length; i++) {
+            String dato = pedirTexto(preguntas[i]);
+            if (dato == null) {
+                return null;
+            }
+            datos[i] = dato.trim();
+        }
+        return MetodoPago.crear(metodo, null, datos);
+    }
+
+    private BigDecimal pedirMonto(String mensaje, BigDecimal sugerido) {
+        while (true) {
+            String entrada = JOptionPane.showInputDialog(this, mensaje, sugerido.toPlainString());
+            if (entrada == null) {
+                return null;
+            }
             try {
-                BigDecimal precio = new BigDecimal(precioStr);
-                int cantidad = Integer.parseInt(cantidadStr);
-                
-                Venta ventaTemp = new Venta(nombre, precio, cantidad);
-                ventasPendientes.add(ventaTemp);
-
-                int item = modeloTabla.getRowCount() + 1;
-                modeloTabla.addRow(new Object[]{item, ventaTemp.getNombre(), "$" + ventaTemp.getPrecio(), ventaTemp.getCantidad(), "$" + ventaTemp.getTotal()});
-
-                txtNombre.setText("");
-                txtPrecio.setText("");
-                txtCantidad.setText("");
-                txtTotal.setText("");
-                txtNombre.requestFocus();
-
-                // Cálculo directo del total de la venta
-                BigDecimal sumaTotal = BigDecimal.ZERO;
-                for (Venta v : ventasPendientes) {
-                    sumaTotal = sumaTotal.add(v.getTotal());
-                }
-                txtTotalVenta.setText("$" + sumaTotal.toString());
-
-            } catch (NumberFormatException ex) {
-                JOptionPane.showMessageDialog(this, "El precio y la cantidad deben ser valores numéricos válidos.", "Error de formato", JOptionPane.ERROR_MESSAGE);
+                return new BigDecimal(entrada.trim());
+            } catch (NumberFormatException e) {
+                JOptionPane.showMessageDialog(this, "Ingrese un monto numérico válido.", "Error de formato", JOptionPane.ERROR_MESSAGE);
             }
-        });
-    }  
+        }
+    }
+
+    private String pedirTexto(String mensaje) {
+        return JOptionPane.showInputDialog(this, mensaje);
+    }
 
     private void actualizarTotal() {
         try {
-            String precioStr = txtPrecio.getText().trim();
-            String cantidadStr = txtCantidad.getText().trim();
-
-            if (precioStr.isEmpty() || cantidadStr.isEmpty()) {
-                txtTotal.setText("");
-                return;
-            }
-
-            BigDecimal precio = new BigDecimal(precioStr);
-            int cantidad = Integer.parseInt(cantidadStr);
-
-            if (cantidad < 0) {
-                txtTotal.setText("");
-                return;
-            }
-
-            Venta tempVenta = new Venta("", precio, cantidad);
-            BigDecimal totalCalculado = tempVenta.calcularTotal(cantidad, precio);
-            txtTotal.setText(totalCalculado.toString());
-
+            BigDecimal precio = new BigDecimal(txtPrecio.getText().trim());
+            int cantidad = Integer.parseInt(txtCantidad.getText().trim());
+            txtTotal.setText(cantidad < 0 ? "" : MetodoPago.formatear(new Venta("", precio, cantidad).getTotal()));
         } catch (NumberFormatException e) {
             txtTotal.setText("");
         }
+    }
+
+    private static void agregar(JPanel panel, Component comp, int fila, double pesoVertical, Insets margen) {
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.gridx = 0;
+        gbc.gridy = fila;
+        gbc.weightx = 1.0;
+        gbc.weighty = pesoVertical;
+        gbc.fill = pesoVertical > 0 ? GridBagConstraints.BOTH : GridBagConstraints.HORIZONTAL;
+        gbc.insets = margen;
+        panel.add(comp, gbc);
+    }
+
+    private static GridBagConstraints posicion(int columna, int fila, Insets margen) {
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.gridx = columna;
+        gbc.gridy = fila;
+        gbc.weightx = 0.33;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.insets = margen;
+        return gbc;
+    }
+
+    private static JPanel crearPanel(LayoutManager layout) {
+        JPanel panel = new JPanel(layout);
+        panel.setBackground(COLOR_FONDO);
+        return panel;
+    }
+
+    private static JLabel etiqueta(String texto) {
+        JLabel etiqueta = new JLabel(texto);
+        etiqueta.setForeground(COLOR_TEXTO_SECUNDARIO);
+        etiqueta.setFont(FUENTE_ETIQUETA);
+        return etiqueta;
+    }
+
+    private static JLabel etiquetaDestacada(String texto) {
+        JLabel etiqueta = new JLabel(texto);
+        etiqueta.setForeground(Color.WHITE);
+        etiqueta.setFont(FUENTE_DESTACADA);
+        return etiqueta;
+    }
+
+    private static JTextField campo() {
+        JTextField campo = new JTextField();
+        Estilos.estilarCampo(campo);
+        return campo;
+    }
+
+    private static JButton boton(String texto, Color fondo, Color colorTexto) {
+        JButton boton = new JButton(texto);
+        boton.setBackground(fondo);
+        boton.setForeground(colorTexto);
+        boton.setFont(FUENTE_ETIQUETA);
+        return boton;
     }
 }
