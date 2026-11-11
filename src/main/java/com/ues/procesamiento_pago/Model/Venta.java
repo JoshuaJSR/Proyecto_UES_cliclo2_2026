@@ -69,7 +69,7 @@ public final class Venta {
         return venta;
     }
 
-    private static BigDecimal aBigDecimal(Object valor) {
+    public static BigDecimal aBigDecimal(Object valor) {
         if (valor instanceof BigDecimal decimal) {
             return decimal;
         }

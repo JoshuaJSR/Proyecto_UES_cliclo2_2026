@@ -2,6 +2,7 @@
 package com.ues.procesamiento_pago.dao;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 import org.bson.Document;
@@ -25,7 +26,7 @@ public class VentaDAO {
         coleccion.insertOne(venta.toDocument(estado, metodoPago, usuario));
     }
 
-    // calcula el proximo numero de venta: 1 si no hay ventas registradas
+    // calcula el proximo numero de venta, 1 si no hay ventas registradas
     public int siguienteNumeroVenta() {
         Document ultimaVenta = coleccion.find()
                 .sort(new Document("id", -1))
@@ -39,7 +40,17 @@ public class VentaDAO {
 
     // lista las ventas filtradas por numero de venta, estado y metodo de pago (null = sin filtro)
     public List<Document> listar(Integer numeroVenta, String estado, String metodoPago) {
+        return listar(null, numeroVenta, estado, metodoPago, null, null);
+    }
+
+    // lista las ventas filtrando por identificador de transaccion (_id), numero de venta,
+    // estado, metodo de pago y rango de fechas (null = sin filtro)
+    public List<Document> listar(ObjectId idTransaccion, Integer numeroVenta, String estado,
+            String metodoPago, Date desde, Date hasta) {
         List<Bson> condiciones = new ArrayList<>();
+        if (idTransaccion != null) {
+            condiciones.add(Filters.eq("_id", idTransaccion));
+        }
         if (numeroVenta != null) {
             condiciones.add(Filters.eq("id", numeroVenta));
         }
@@ -48,6 +59,13 @@ public class VentaDAO {
         }
         if (metodoPago != null && !metodoPago.isEmpty()) {
             condiciones.add(Filters.eq("metodoPago", metodoPago));
+        }
+        if (desde != null && hasta != null) {
+            condiciones.add(Filters.and(Filters.gte("fecha", desde), Filters.lte("fecha", hasta)));
+        } else if (desde != null) {
+            condiciones.add(Filters.gte("fecha", desde));
+        } else if (hasta != null) {
+            condiciones.add(Filters.lte("fecha", hasta));
         }
         Bson filtro = condiciones.isEmpty() ? new Document() : Filters.and(condiciones);
         return coleccion.find(filtro)
