@@ -10,6 +10,8 @@ import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.LayoutManager;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -90,7 +92,14 @@ public class VentasForm extends JFrame {
 
         add(crearContenido());
         conectarEventos();
-        txtNombre.requestFocusInWindow();
+        
+        // forzar el focus cuando la ventana ya este completamente abierta
+        addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowOpened(WindowEvent e) {
+                txtNombre.requestFocusInWindow();
+            }
+        });
     }
 
     private JPanel crearContenido() {
@@ -111,7 +120,7 @@ public class VentasForm extends JFrame {
         JTable tablaVentas = new JTable(modeloTabla);
         tablaVentas.setPreferredScrollableViewportSize(new Dimension(450, 120));
         
-        // panel interno para poner el item y el nombre juntos en la misma linea
+        // panel auxiliar para meter el item y el nombre en la misma celda de la rejilla
         JPanel panelNombre = crearPanel(new GridBagLayout());
         GridBagConstraints gbcNombre = new GridBagConstraints();
         gbcNombre.insets = new Insets(0, 0, 0, 8);
@@ -218,10 +227,10 @@ public class VentasForm extends JFrame {
             txtCantidad.setText("");
             txtTotal.setText("");
             
-            // aqui actualizo el numero de item sumando uno a la lista
+            // se actualiza el numero de item sumando elementos en la lista
             txtItem.setText(String.valueOf(ventasPendientes.size() + 1));
             
-            txtNombre.requestFocus();
+            txtNombre.requestFocusInWindow();
             txtTotalVenta.setText("$" + MetodoPago.formatear(totalVenta()));
         } catch (NumberFormatException ex) {
             JOptionPane.showMessageDialog(this, "El precio y la cantidad deben ser valores numéricos válidos.", "Error de formato", JOptionPane.ERROR_MESSAGE);
@@ -259,6 +268,8 @@ public class VentasForm extends JFrame {
         modeloTabla.limpiar();
         txtItem.setText("1");
         txtTotalVenta.setText("$0.00");
+        
+        txtNombre.requestFocusInWindow();
     }
 
     private BigDecimal totalVenta() {
