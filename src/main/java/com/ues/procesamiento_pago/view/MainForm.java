@@ -10,7 +10,6 @@ import javax.swing.JLabel;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.SwingConstants;
 
@@ -106,7 +105,7 @@ public class MainForm extends JFrame {
         });
 
         itemConsultarVentas.addActionListener(e -> {
-            JOptionPane.showMessageDialog(this, "Consultar ventas (pendiente)");
+            new ConsultaVentasForm(this.mongoDB).setVisible(true);
         });
     }
 
