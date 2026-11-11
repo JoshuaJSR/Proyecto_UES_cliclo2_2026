@@ -47,14 +47,18 @@ public class VentasForm extends JFrame {
     private JTextField txtCantidad;
     private JTextField txtTotal;
     private JTextField txtTotalVenta;
+    private JTextField txtNumeroVenta;
     private JComboBox<String> comboMetodos;
     private JButton btnAgregar;
     private JButton btnGuardar;
     private TableVentasModel modeloTabla;
     private JTable tablaVentas;
 
-    // variable para controlar si estamos editando una fila existente (-1 = nuevo)
+    // variable para controlar si estamos editando una fila existente
     private int indiceFilaSeleccionada = -1;
+
+    // numero de venta que se asignara a los items de la venta que se esta registrando
+    private int numeroVentaActual = 1;
 
     private final String usuario;
     private final VentaDAO dao;
@@ -87,6 +91,7 @@ public class VentasForm extends JFrame {
             this.dao = null;
             JOptionPane.showMessageDialog(null, "No hay una conexión activa a MongoDB.");
         }
+        this.numeroVentaActual = dao != null ? dao.siguienteNumeroVenta() : 1;
 
         setTitle("Ingreso de ventas");
         setSize(1080, 740);
@@ -144,9 +149,10 @@ public class VentasForm extends JFrame {
         agregar(panel, crearPanelCamposMedios(), 3, 0, MARGEN);
         agregar(panel, btnAgregar, 4, 0, new Insets(10, 0, 10, 0));
         agregar(panel, new JScrollPane(tablaVentas), 5, 1, SIN_MARGEN);
-        agregar(panel, crearPanelTotal(), 6, 0, new Insets(8, 0, 8, 0));
-        agregar(panel, crearPanelPago(), 7, 0, SIN_MARGEN);
-        agregar(panel, crearPanelBotones(), 8, 0, SIN_MARGEN);
+        agregar(panel, crearPanelNumeroVenta(), 6, 0, new Insets(8, 0, 0, 0));
+        agregar(panel, crearPanelTotal(), 7, 0, new Insets(4, 0, 8, 0));
+        agregar(panel, crearPanelPago(), 8, 0, SIN_MARGEN);
+        agregar(panel, crearPanelBotones(), 9, 0, SIN_MARGEN);
         return panel;
     }
 
@@ -161,6 +167,17 @@ public class VentasForm extends JFrame {
             panel.add(etiqueta(titulos[i]), posicion(i, 0, margen));
             panel.add(campos[i], posicion(i, 1, margen));
         }
+        return panel;
+    }
+
+    private JPanel crearPanelNumeroVenta() {
+        JPanel panel = crearPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        txtNumeroVenta = campo();
+        txtNumeroVenta.setPreferredSize(new Dimension(100, 35));
+        txtNumeroVenta.setEditable(false);
+        txtNumeroVenta.setText(String.valueOf(numeroVentaActual));
+        panel.add(etiquetaDestacada("NÚMERO DE VENTA:"));
+        panel.add(txtNumeroVenta);
         return panel;
     }
 
@@ -293,10 +310,14 @@ public class VentasForm extends JFrame {
         }
 
         if (dao != null) {
+            
             for (Venta item : ventasPendientes) {
+                item.setId(numeroVentaActual);
                 dao.insertar(item, transaccion.getEstado(), transaccion.getMetodo(), usuario);
             }
         }
+        numeroVentaActual = dao != null ? dao.siguienteNumeroVenta() : numeroVentaActual + 1;
+        txtNumeroVenta.setText(String.valueOf(numeroVentaActual));
 
         JOptionPane.showMessageDialog(this, metodoPago.comprobante(transaccion), "Venta registrada", JOptionPane.INFORMATION_MESSAGE);
         modeloTabla.limpiar();
