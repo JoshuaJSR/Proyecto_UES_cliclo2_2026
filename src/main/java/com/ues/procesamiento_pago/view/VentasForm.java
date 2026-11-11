@@ -78,7 +78,7 @@ public class VentasForm extends JFrame {
             this.dao = new VentaDAO(mongoDB);
         } else {
             this.dao = null;
-            JOptionPane.showMessageDialog(this, "No hay una conexión activa a MongoDB.");
+            JOptionPane.showMessageDialog(null, "No hay una conexión activa a MongoDB.");
         }
 
         setTitle("Ingreso de ventas");

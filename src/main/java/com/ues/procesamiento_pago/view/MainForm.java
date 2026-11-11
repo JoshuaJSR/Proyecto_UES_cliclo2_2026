@@ -19,12 +19,10 @@ import com.ues.procesamiento_pago.config.MongoDBConnection;
 public class MainForm extends JFrame {
     private MongoDBConnection mongoDB;
     private String nombreUsuario;
-    private String rol;
 
     public MainForm(MongoDBConnection mongoDB, String nombreUsuario, String rol) {
         this.mongoDB = mongoDB;
         this.nombreUsuario = nombreUsuario;
-        this.rol = rol;
 
         setTitle("Sistema de procesamiento de pagos");
         setExtendedState(JFrame.MAXIMIZED_BOTH);

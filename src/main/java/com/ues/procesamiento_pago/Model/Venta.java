@@ -5,13 +5,13 @@ import java.util.Date;
 
 import org.bson.Document;
 
-public class Venta {
+public final class Venta {
     private int id;
-    private String nombre;
-    private BigDecimal precio;
-    private int cantidad;
-    private BigDecimal total;
-    private Date fecha;
+    private final String nombre;
+    private final BigDecimal precio;
+    private final int cantidad;
+    private final BigDecimal total;
+    private final Date fecha;
     
     public Venta(String nombre, BigDecimal precio, int cantidad) {
         this.nombre = nombre;

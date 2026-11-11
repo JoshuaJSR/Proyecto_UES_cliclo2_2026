@@ -6,7 +6,9 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
+import java.awt.HeadlessException;
 import java.awt.Insets;
+import java.lang.reflect.InvocationTargetException;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
@@ -17,9 +19,6 @@ import javax.swing.JPanel;
 import javax.swing.JPasswordField;
 import javax.swing.JTextField;
 
-import org.bson.Document;
-
-import com.mongodb.client.MongoCollection;
 import com.ues.procesamiento_pago.Model.Usuario;
 import com.ues.procesamiento_pago.config.MongoDBConnection;
 import com.ues.procesamiento_pago.dao.UsuarioDAO;
@@ -35,7 +34,6 @@ public class LoginForm extends JFrame {
     private JButton btnLogin;
 
     private MongoDBConnection mongoDB;
-    private MongoCollection<Document> usuarios;
     private UsuarioDAO dao;
     
     public LoginForm(MongoDBConnection mongoDB) {
@@ -45,7 +43,7 @@ public class LoginForm extends JFrame {
             this.dao = new UsuarioDAO(this.mongoDB);
         } else 
         {
-        JOptionPane.showMessageDialog(this, "Advertencia: No hay una conexión activa a MongoDB.");
+        JOptionPane.showMessageDialog(null, "Advertencia: No hay una conexión activa a MongoDB.");
         }
 
         setTitle("Inicio de sesión");
@@ -144,7 +142,7 @@ public class LoginForm extends JFrame {
                 } else {
                     JOptionPane.showMessageDialog(this, "Usuario o contraseña incorrectos", "Error", JOptionPane.ERROR_MESSAGE);
                 }
-            } catch (Exception ex) {
+            } catch (HeadlessException | ClassNotFoundException | IllegalAccessException | IllegalArgumentException | InstantiationException | NoSuchMethodException | SecurityException | InvocationTargetException ex) {
                 JOptionPane.showMessageDialog(this, "Error al iniciar sesión: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
             }
         });
