@@ -51,6 +51,10 @@ public class VentasForm extends JFrame {
     private JButton btnAgregar;
     private JButton btnGuardar;
     private TableVentasModel modeloTabla;
+    private JTable tablaVentas;
+
+    // variable para controlar si estamos editando una fila existente (-1 = nuevo)
+    private int indiceFilaSeleccionada = -1;
 
     private final String usuario;
     private final VentaDAO dao;
@@ -93,7 +97,6 @@ public class VentasForm extends JFrame {
         add(crearContenido());
         conectarEventos();
         
-        // forzar el focus cuando la ventana ya este completamente abierta
         addWindowListener(new WindowAdapter() {
             @Override
             public void windowOpened(WindowEvent e) {
@@ -117,10 +120,9 @@ public class VentasForm extends JFrame {
         btnAgregar = boton("AGREGAR PRODUCTO", COLOR_VERDE, Color.BLACK);
 
         modeloTabla = new TableVentasModel(ventasPendientes);
-        JTable tablaVentas = new JTable(modeloTabla);
+        tablaVentas = new JTable(modeloTabla);
         tablaVentas.setPreferredScrollableViewportSize(new Dimension(450, 120));
         
-        // panel auxiliar para meter el item y el nombre en la misma celda de la rejilla
         JPanel panelNombre = crearPanel(new GridBagLayout());
         GridBagConstraints gbcNombre = new GridBagConstraints();
         gbcNombre.insets = new Insets(0, 0, 0, 8);
@@ -207,10 +209,30 @@ public class VentasForm extends JFrame {
         txtPrecio.getDocument().addDocumentListener(listenerCalculo);
         txtCantidad.getDocument().addDocumentListener(listenerCalculo);
         btnGuardar.addActionListener(e -> registrarVenta());
-        btnAgregar.addActionListener(e -> agregarProducto());
+        btnAgregar.addActionListener(e -> agregarOActualizarProducto());
+
+        // listener para cuando se selecciona una fila de la tabla y pasar los datos a los txt
+        tablaVentas.getSelectionModel().addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting() && tablaVentas.getSelectedRow() != -1) {
+                int fila = tablaVentas.getSelectedRow();
+                indiceFilaSeleccionada = fila;
+                
+                // recuperamos la venta desde el modelo de la tabla
+                Venta v = modeloTabla.getVentaAt(fila);
+                
+                txtItem.setText(String.valueOf(fila + 1));
+                txtNombre.setText(v.getNombre());
+                txtPrecio.setText(v.getPrecio().toPlainString());
+                txtCantidad.setText(String.valueOf(v.getCantidad()));
+                
+                // cambiamos texto del boton para indicar que estamos actualizando
+                btnAgregar.setText("ACTUALIZAR PRODUCTO");
+            }
+        });
     }
 
-    private void agregarProducto() {
+    // metodo unificado para agregar nuevo o actualizar el seleccionado
+    private void agregarOActualizarProducto() {
         String nombre = txtNombre.getText().trim();
         String precioStr = txtPrecio.getText().trim();
         String cantidadStr = txtCantidad.getText().trim();
@@ -221,13 +243,25 @@ public class VentasForm extends JFrame {
         }
 
         try {
-            modeloTabla.agregar(new Venta(nombre, new BigDecimal(precioStr), Integer.parseInt(cantidadStr)));
+            BigDecimal precio = new BigDecimal(precioStr);
+            int cantidad = Integer.parseInt(cantidadStr);
+
+            if (indiceFilaSeleccionada == -1) {
+                // agregamos nuevo registro si no hay ninguno seleccionado
+                modeloTabla.agregar(new Venta(nombre, precio, cantidad));
+            } else {
+                // actualizamos el registro existente en la posicion seleccionada
+                modeloTabla.actualizar(indiceFilaSeleccionada, new Venta(nombre, precio, cantidad));
+                indiceFilaSeleccionada = -1;
+                btnAgregar.setText("AGREGAR PRODUCTO");
+                tablaVentas.clearSelection();
+            }
+
             txtNombre.setText("");
             txtPrecio.setText("");
             txtCantidad.setText("");
             txtTotal.setText("");
             
-            // se actualiza el numero de item sumando elementos en la lista
             txtItem.setText(String.valueOf(ventasPendientes.size() + 1));
             
             txtNombre.requestFocusInWindow();
@@ -266,6 +300,8 @@ public class VentasForm extends JFrame {
 
         JOptionPane.showMessageDialog(this, metodoPago.comprobante(transaccion), "Venta registrada", JOptionPane.INFORMATION_MESSAGE);
         modeloTabla.limpiar();
+        indiceFilaSeleccionada = -1;
+        btnAgregar.setText("AGREGAR PRODUCTO");
         txtItem.setText("1");
         txtTotalVenta.setText("$0.00");
         

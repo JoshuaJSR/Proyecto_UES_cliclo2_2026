@@ -1,5 +1,5 @@
 package com.ues.procesamiento_pago.view.components;
-//clase que extiende de AbstractTableModel para mostrar los datos de las ventas en una tabla
+
 import java.util.List;
 
 import javax.swing.table.AbstractTableModel;
@@ -43,9 +43,20 @@ public class TableVentasModel extends AbstractTableModel {
         };
     }
 
+    // metodo para recuperar la venta seleccionada por el indice de la fila
+    public Venta getVentaAt(int fila) {
+        return ventas.get(fila);
+    }
+
     public void agregar(Venta venta) {
         ventas.add(venta);
         fireTableRowsInserted(ventas.size() - 1, ventas.size() - 1);
+    }
+
+    // metodo para actualizar una venta existente en una fila especifica
+    public void actualizar(int fila, Venta venta) {
+        ventas.set(fila, venta);
+        fireTableRowsUpdated(fila, fila);
     }
 
     public void limpiar() {
