@@ -39,6 +39,7 @@ import com.ues.procesamiento_pago.util.Estilos;
 import com.ues.procesamiento_pago.view.components.TableVentasModel;
 
 public class VentasForm extends JFrame {
+    private JTextField txtItem;
     private JTextField txtNombre;
     private JTextField txtPrecio;
     private JTextField txtCantidad;
@@ -99,22 +100,28 @@ public class VentasForm extends JFrame {
         lblTitulo.setFont(new Font("SansSerif", Font.BOLD, 26));
         lblTitulo.setForeground(Color.WHITE);
 
+        txtItem = campo();
+        txtItem.setEditable(false);
+        txtItem.setText("1");
         txtNombre = campo();
         btnAgregar = boton("AGREGAR PRODUCTO", COLOR_VERDE, Color.BLACK);
 
         modeloTabla = new TableVentasModel(ventasPendientes);
         JTable tablaVentas = new JTable(modeloTabla);
         tablaVentas.setPreferredScrollableViewportSize(new Dimension(450, 120));
-
+        
+        // aqui se agregan los componentes al gridbag
         agregar(panel, lblTitulo, 0, 0, new Insets(0, 0, 10, 0));
-        agregar(panel, etiqueta("Nombre del producto"), 1, 0, MARGEN);
-        agregar(panel, txtNombre, 2, 0, MARGEN);
-        agregar(panel, crearPanelCamposMedios(), 3, 0, MARGEN);
-        agregar(panel, btnAgregar, 4, 0, new Insets(10, 0, 10, 0));
-        agregar(panel, new JScrollPane(tablaVentas), 5, 1, SIN_MARGEN);
-        agregar(panel, crearPanelTotal(), 6, 0, new Insets(8, 0, 8, 0));
-        agregar(panel, crearPanelPago(), 7, 0, SIN_MARGEN);
-        agregar(panel, crearPanelBotones(), 8, 0, SIN_MARGEN);
+        agregar(panel, etiqueta("Item"), 1, 0, MARGEN);
+        agregar(panel, txtItem, 2, 0, MARGEN);
+        agregar(panel, etiqueta("Nombre del producto"), 3, 0, MARGEN);
+        agregar(panel, txtNombre, 4, 0, MARGEN);
+        agregar(panel, crearPanelCamposMedios(), 5, 0, MARGEN);
+        agregar(panel, btnAgregar, 6, 0, new Insets(10, 0, 10, 0));
+        agregar(panel, new JScrollPane(tablaVentas), 7, 1, SIN_MARGEN);
+        agregar(panel, crearPanelTotal(), 8, 0, new Insets(8, 0, 8, 0));
+        agregar(panel, crearPanelPago(), 9, 0, SIN_MARGEN);
+        agregar(panel, crearPanelBotones(), 10, 0, SIN_MARGEN);
         return panel;
     }
 
@@ -196,6 +203,10 @@ public class VentasForm extends JFrame {
             txtPrecio.setText("");
             txtCantidad.setText("");
             txtTotal.setText("");
+            
+            // actualiza el numero de item sumando uno a la lista
+            txtItem.setText(String.valueOf(ventasPendientes.size() + 1));
+            
             txtNombre.requestFocus();
             txtTotalVenta.setText("$" + MetodoPago.formatear(totalVenta()));
         } catch (NumberFormatException ex) {
@@ -232,6 +243,7 @@ public class VentasForm extends JFrame {
 
         JOptionPane.showMessageDialog(this, metodoPago.comprobante(transaccion), "Venta registrada", JOptionPane.INFORMATION_MESSAGE);
         modeloTabla.limpiar();
+        txtItem.setText("1");
         txtTotalVenta.setText("$0.00");
     }
 
