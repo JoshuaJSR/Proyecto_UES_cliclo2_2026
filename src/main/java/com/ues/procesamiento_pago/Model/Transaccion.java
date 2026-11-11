@@ -23,6 +23,7 @@ public class Transaccion {
         this.estado = estado;
     }
 
+    // identificador que asigna MongoDB al guardar la transaccion
     public ObjectId getId() {
         return id;
     }
@@ -31,6 +32,7 @@ public class Transaccion {
         this.id = id;
     }
 
+    // venta a la que corresponde la transaccion
     public int getIdVenta() {
         return idVenta;
     }
@@ -55,10 +57,12 @@ public class Transaccion {
         return mensaje;
     }
 
+    // motivo por el que la transaccion quedo rechazada o pendiente
     public void setMensaje(String mensaje) {
         this.mensaje = mensaje;
     }
 
+    // Mapea la transaccion a un Document de la coleccion transacciones
     public Document toDocument() {
         Document documento = new Document("idVenta", idVenta)
                 .append("metodo", metodo)

@@ -1,7 +1,6 @@
 package com.ues.procesamiento_pago.Model;
 
 import java.math.BigDecimal;
-import java.util.Date;
 
 import org.bson.Document;
 import org.bson.types.Decimal128;
@@ -12,14 +11,12 @@ public final class Venta {
     private final BigDecimal precio;
     private final int cantidad;
     private final BigDecimal total;
-    private final Date fecha;
     
     public Venta(String nombre, BigDecimal precio, int cantidad) {
         this.nombre = nombre;
         this.precio = precio;
         this.cantidad = cantidad;
         this.total = calcularTotal(cantidad, precio);
-        this.fecha = new Date();
     }
     
     //calcular total
@@ -50,10 +47,6 @@ public final class Venta {
 
     public BigDecimal getTotal() {
         return total;
-    }
-
-    public Date getFecha() {
-        return fecha;
     }
 
     //Reconstruye una venta a partir de un documento de la coleccion ventas
@@ -90,7 +83,6 @@ public final class Venta {
                 .append("cantidad", cantidad)
                 .append("total", total)
                 .append("estado", estado.name())
-                .append("fecha", fecha)
                 .append("metodoPago", metodoPago)
                 .append("usuario", usuario);
     }

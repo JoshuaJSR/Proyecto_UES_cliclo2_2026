@@ -251,7 +251,7 @@ public class ResumenPagosForm extends JFrame {
         lblIngresos.setText("Ingresos aprobados: $" + MetodoPago.formatear(aprobado));
         lblDetalle.setText(transacciones == 0
                 ? "No hay transacciones registradas."
-                : procesadas + " aprobadas, " + rechazadas + " rechazadas (no suman a los ingresos) y "
+                : procesadas + " aprobadas, " + rechazadas + " rechazadas  y "
                         + pendientes + " pendientes. Importe rechazado: $" + MetodoPago.formatear(rechazado) + ".");
     }
 
