@@ -242,7 +242,7 @@ public class ModificacionVentasForm extends JFrame {
         String textoId = txtFiltroId.getText().trim();
         if (!textoId.isEmpty()) {
             try {
-                numeroVenta = Integer.parseInt(textoId);
+                numeroVenta = Integer.valueOf(textoId);
             } catch (NumberFormatException ex) {
                 JOptionPane.showMessageDialog(this, "El número de venta debe ser numérico.", "Error de formato", JOptionPane.ERROR_MESSAGE);
                 return;

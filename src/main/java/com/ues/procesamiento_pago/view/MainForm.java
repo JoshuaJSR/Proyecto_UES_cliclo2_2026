@@ -70,8 +70,11 @@ public class MainForm extends JFrame {
 
         JMenu menuMovimientos = crearMenu("Movimientos");
         JMenuItem itemIngresoVentas = crearItem("Ingreso de ventas");
+        JMenuItem itemPagoPendientes = crearItem("Pago de ventas pendientes");
+        itemPagoPendientes.addActionListener(e -> new PagoVentaPendienteForm(this.mongoDB).setVisible(true));
         JMenuItem itemModificacionVentas = crearItem("Modificación de ventas");
         menuMovimientos.add(itemIngresoVentas);
+        menuMovimientos.add(itemPagoPendientes);
         menuMovimientos.add(itemModificacionVentas);
 
         JMenu menuConsultas = crearMenu("Consultas");
