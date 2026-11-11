@@ -90,6 +90,7 @@ public class VentasForm extends JFrame {
 
         add(crearContenido());
         conectarEventos();
+        txtNombre.requestFocusInWindow();
     }
 
     private JPanel crearContenido() {
@@ -110,18 +111,31 @@ public class VentasForm extends JFrame {
         JTable tablaVentas = new JTable(modeloTabla);
         tablaVentas.setPreferredScrollableViewportSize(new Dimension(450, 120));
         
-        // aqui se agregan los componentes al gridbag
+        // panel interno para poner el item y el nombre juntos en la misma linea
+        JPanel panelNombre = crearPanel(new GridBagLayout());
+        GridBagConstraints gbcNombre = new GridBagConstraints();
+        gbcNombre.insets = new Insets(0, 0, 0, 8);
+        gbcNombre.fill = GridBagConstraints.HORIZONTAL;
+
+        txtItem.setPreferredSize(new Dimension(60, 30));
+        gbcNombre.gridx = 0;
+        gbcNombre.weightx = 0.0;
+        panelNombre.add(txtItem, gbcNombre);
+
+        gbcNombre.gridx = 1;
+        gbcNombre.weightx = 1.0;
+        gbcNombre.insets = new Insets(0, 0, 0, 0);
+        panelNombre.add(txtNombre, gbcNombre);
+
         agregar(panel, lblTitulo, 0, 0, new Insets(0, 0, 10, 0));
-        agregar(panel, etiqueta("Item"), 1, 0, MARGEN);
-        agregar(panel, txtItem, 2, 0, MARGEN);
-        agregar(panel, etiqueta("Nombre del producto"), 3, 0, MARGEN);
-        agregar(panel, txtNombre, 4, 0, MARGEN);
-        agregar(panel, crearPanelCamposMedios(), 5, 0, MARGEN);
-        agregar(panel, btnAgregar, 6, 0, new Insets(10, 0, 10, 0));
-        agregar(panel, new JScrollPane(tablaVentas), 7, 1, SIN_MARGEN);
-        agregar(panel, crearPanelTotal(), 8, 0, new Insets(8, 0, 8, 0));
-        agregar(panel, crearPanelPago(), 9, 0, SIN_MARGEN);
-        agregar(panel, crearPanelBotones(), 10, 0, SIN_MARGEN);
+        agregar(panel, etiqueta("Nombre del producto"), 1, 0, MARGEN);
+        agregar(panel, panelNombre, 2, 0, MARGEN);
+        agregar(panel, crearPanelCamposMedios(), 3, 0, MARGEN);
+        agregar(panel, btnAgregar, 4, 0, new Insets(10, 0, 10, 0));
+        agregar(panel, new JScrollPane(tablaVentas), 5, 1, SIN_MARGEN);
+        agregar(panel, crearPanelTotal(), 6, 0, new Insets(8, 0, 8, 0));
+        agregar(panel, crearPanelPago(), 7, 0, SIN_MARGEN);
+        agregar(panel, crearPanelBotones(), 8, 0, SIN_MARGEN);
         return panel;
     }
 
@@ -204,7 +218,7 @@ public class VentasForm extends JFrame {
             txtCantidad.setText("");
             txtTotal.setText("");
             
-            // actualiza el numero de item sumando uno a la lista
+            // aqui actualizo el numero de item sumando uno a la lista
             txtItem.setText(String.valueOf(ventasPendientes.size() + 1));
             
             txtNombre.requestFocus();
