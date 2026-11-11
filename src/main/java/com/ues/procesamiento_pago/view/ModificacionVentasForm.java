@@ -11,6 +11,8 @@ import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.LayoutManager;
 import java.math.BigDecimal;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.List;
 
 import javax.swing.BorderFactory;
@@ -23,18 +25,17 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
-import javax.swing.event.DocumentEvent;
-import javax.swing.event.DocumentListener;
+import javax.swing.table.DefaultTableModel;
 
 import org.bson.Document;
 import org.bson.types.ObjectId;
 
-import com.ues.procesamiento_pago.Model.Venta;
+import com.ues.procesamiento_pago.Model.EstadoPago;
 import com.ues.procesamiento_pago.Strategy.MetodoPago;
 import com.ues.procesamiento_pago.config.MongoDBConnection;
+import com.ues.procesamiento_pago.dao.TransaccionDAO;
 import com.ues.procesamiento_pago.dao.VentaDAO;
 import com.ues.procesamiento_pago.util.Estilos;
-import com.ues.procesamiento_pago.view.components.TableVentasRegistradasModel;
 
 public class ModificacionVentasForm extends JFrame {
     private static final String TODOS = "Todos";
@@ -45,28 +46,28 @@ public class ModificacionVentasForm extends JFrame {
     private JButton btnBuscar;
     private JButton btnLimpiarFiltros;
     private JButton btnGuardar;
+    private JButton btnAnular;
     private JLabel lblResumen;
-    private JTable tablaVentas;
-    private TableVentasRegistradasModel modeloTabla;
+    private JTable tablaTransacciones;
+    private DefaultTableModel modeloTabla;
 
     private JTextField txtIdVenta;
-    private JTextField txtNombre;
-    private JTextField txtPrecio;
-    private JTextField txtCantidad;
-    private JTextField txtTotal;
+    private JTextField txtMonto;
     private JComboBox<String> comboEstado;
     private JComboBox<String> comboMetodo;
 
-    // item de venta actualmente seleccionado en la tabla 
-    private Document ventaSeleccionada;
+    private Document transaccionSeleccionada;
 
-    private final VentaDAO dao;
+    private final VentaDAO daoVenta;
+    private final TransaccionDAO daoTransaccion;
 
     private static final String[] METODOS = {
         "Efectivo", "Pago con tarjeta", "Pago Electronico", "Transferencia Bancaria"
     };
 
     private static final String[] ESTADOS = {"PENDIENTE", "PROCESADO", "RECHAZADO"};
+
+    private static final String[] COLUMNAS = {"N° VENTA", "MÉTODO DE PAGO", "MONTO", "ESTADO", "FECHA"};
 
     private static final Color COLOR_FONDO = Color.DARK_GRAY;
     private static final Color COLOR_TEXTO_SECUNDARIO = new Color(160, 160, 160);
@@ -75,17 +76,20 @@ public class ModificacionVentasForm extends JFrame {
     private static final Font FUENTE_ETIQUETA = new Font("SansSerif", Font.BOLD, 12);
     private static final Insets MARGEN = new Insets(3, 0, 3, 0);
     private static final Insets SIN_MARGEN = new Insets(0, 0, 0, 0);
+    private static final SimpleDateFormat FORMATO_FECHA = new SimpleDateFormat("dd/MM/yyyy HH:mm");
 
     public ModificacionVentasForm(MongoDBConnection mongoDB) {
         if (mongoDB != null && mongoDB.getDatabase() != null) {
-            this.dao = new VentaDAO(mongoDB);
+            this.daoVenta = new VentaDAO(mongoDB);
+            this.daoTransaccion = new TransaccionDAO(mongoDB);
         } else {
-            this.dao = null;
+            this.daoVenta = null;
+            this.daoTransaccion = null;
             JOptionPane.showMessageDialog(null, "No hay una conexión activa a MongoDB.");
         }
 
         setTitle("Modificación de ventas");
-        setSize(1180, 780);
+        setSize(1000, 680);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setResizable(false);
@@ -93,7 +97,7 @@ public class ModificacionVentasForm extends JFrame {
         add(crearContenido());
         conectarEventos();
 
-        if (dao != null) {
+        if (daoTransaccion != null) {
             buscar();
         }
     }
@@ -103,7 +107,7 @@ public class ModificacionVentasForm extends JFrame {
         panel.setBorder(BorderFactory.createEmptyBorder(12, 18, 16, 18));
 
         JLabel lblTitulo = new JLabel("MODIFICACIÓN DE VENTAS", JLabel.CENTER);
-        lblTitulo.setFont(new Font("SansSerif", Font.BOLD, 26));
+        lblTitulo.setFont(new Font("SansSerif", Font.BOLD, 24));
         lblTitulo.setForeground(Color.WHITE);
 
         agregar(panel, lblTitulo, 0, 0, new Insets(0, 0, 10, 0));
@@ -137,22 +141,26 @@ public class ModificacionVentasForm extends JFrame {
     }
 
     private JPanel crearPanelTabla() {
-        modeloTabla = new TableVentasRegistradasModel();
-        tablaVentas = new JTable(modeloTabla);
-        tablaVentas.setBackground(new Color(25, 25, 25));
-        tablaVentas.setForeground(Color.WHITE);
-        tablaVentas.setGridColor(new Color(60, 60, 60));
-        tablaVentas.setSelectionBackground(new Color(45, 120, 85));
-        tablaVentas.setSelectionForeground(Color.WHITE);
-        tablaVentas.setRowHeight(24);
-        tablaVentas.getTableHeader().setBackground(Color.BLACK);
-        tablaVentas.getTableHeader().setForeground(Color.WHITE);
-        tablaVentas.getTableHeader().setFont(FUENTE_ETIQUETA);
-        tablaVentas.setAutoCreateRowSorter(true);
-        tablaVentas.getColumnModel().getColumn(1).setPreferredWidth(200);
+        modeloTabla = new DefaultTableModel(COLUMNAS, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        tablaTransacciones = new JTable(modeloTabla);
+        tablaTransacciones.setBackground(new Color(25, 25, 25));
+        tablaTransacciones.setForeground(Color.WHITE);
+        tablaTransacciones.setGridColor(new Color(60, 60, 60));
+        tablaTransacciones.setSelectionBackground(new Color(45, 120, 85));
+        tablaTransacciones.setSelectionForeground(Color.WHITE);
+        tablaTransacciones.setRowHeight(24);
+        tablaTransacciones.getTableHeader().setBackground(Color.BLACK);
+        tablaTransacciones.getTableHeader().setForeground(Color.WHITE);
+        tablaTransacciones.getTableHeader().setFont(FUENTE_ETIQUETA);
+        tablaTransacciones.setAutoCreateRowSorter(true);
 
         JPanel panel = crearPanel(new BorderLayout(0, 4));
-        panel.add(new JScrollPane(tablaVentas), BorderLayout.CENTER);
+        panel.add(new JScrollPane(tablaTransacciones), BorderLayout.CENTER);
 
         lblResumen = new JLabel(" ");
         lblResumen.setForeground(COLOR_TEXTO_SECUNDARIO);
@@ -169,30 +177,28 @@ public class ModificacionVentasForm extends JFrame {
 
         txtIdVenta = campo();
         txtIdVenta.setEditable(false);
-        txtNombre = campo();
-        txtPrecio = campo();
-        txtCantidad = campo();
-        txtTotal = campo();
-        txtTotal.setEditable(false);
+        txtMonto = campo();
+        txtMonto.setEditable(false);
         comboEstado = combo(ESTADOS, false);
         comboMetodo = combo(METODOS, false);
 
         agregarCampo(panel, "N° DE VENTA:", txtIdVenta, 0, 0);
-        agregarCampo(panel, "PRODUCTO:", txtNombre, 2, 0);
-        agregarCampo(panel, "PRECIO UNITARIO:", txtPrecio, 4, 0);
-        agregarCampo(panel, "CANTIDAD:", txtCantidad, 6, 0);
-        agregarCampo(panel, "TOTAL:", txtTotal, 0, 2);
-        agregarCampo(panel, "ESTADO:", comboEstado, 2, 2);
-        agregarCampo(panel, "MÉTODO DE PAGO:", comboMetodo, 4, 2);
+        agregarCampo(panel, "MONTO:", txtMonto, 2, 0);
+        agregarCampo(panel, "ESTADO:", comboEstado, 4, 0);
+        agregarCampo(panel, "MÉTODO DE PAGO:", comboMetodo, 6, 0);
         return panel;
     }
 
     private JPanel crearPanelBotones() {
         JPanel panel = crearPanel(new BorderLayout());
         btnGuardar = boton("GUARDAR CAMBIOS", COLOR_VERDE, Color.BLACK);
+        btnAnular = boton("ANULAR VENTA", COLOR_ROJO, Color.WHITE);
         JButton btnCancelar = boton("Cancelar", COLOR_ROJO, Color.WHITE);
         btnCancelar.addActionListener(e -> dispose());
-        panel.add(btnGuardar, BorderLayout.WEST);
+        JPanel izquierda = crearPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        izquierda.add(btnGuardar);
+        izquierda.add(btnAnular);
+        panel.add(izquierda, BorderLayout.WEST);
         panel.add(btnCancelar, BorderLayout.EAST);
         return panel;
     }
@@ -201,33 +207,33 @@ public class ModificacionVentasForm extends JFrame {
         btnBuscar.addActionListener(e -> buscar());
         btnLimpiarFiltros.addActionListener(e -> limpiarFiltros());
         btnGuardar.addActionListener(e -> guardarCambios());
+        btnAnular.addActionListener(e -> anularVenta());
         txtFiltroId.addActionListener(e -> buscar());
 
-        DocumentListener listenerCalculo = new DocumentListener() {
-            @Override
-            public void insertUpdate(DocumentEvent e) { actualizarTotal(); }
-            @Override
-            public void removeUpdate(DocumentEvent e) { actualizarTotal(); }
-            @Override
-            public void changedUpdate(DocumentEvent e) { actualizarTotal(); }
-        };
-        txtPrecio.getDocument().addDocumentListener(listenerCalculo);
-        txtCantidad.getDocument().addDocumentListener(listenerCalculo);
-
-        tablaVentas.getSelectionModel().addListSelectionListener(e -> {
-            if (!e.getValueIsAdjusting() && tablaVentas.getSelectedRow() != -1) {
-                int fila = tablaVentas.convertRowIndexToModel(tablaVentas.getSelectedRow());
+        tablaTransacciones.getSelectionModel().addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting() && tablaTransacciones.getSelectedRow() != -1) {
+                int fila = tablaTransacciones.convertRowIndexToModel(tablaTransacciones.getSelectedRow());
                 if (fila < 0 || fila >= modeloTabla.getRowCount()) {
                     return;
                 }
-                ventaSeleccionada = modeloTabla.getVentaAt(fila);
-                mostrarVenta(ventaSeleccionada);
+                transaccionSeleccionada = obtenerTransaccionDeFila(fila);
+                mostrarTransaccion(transaccionSeleccionada);
             }
         });
     }
 
+    // recupera el Document de la transaccion de la fila indicada 
+    private final List<Document> transaccionesActuales = new java.util.ArrayList<>();
+
+    private Document obtenerTransaccionDeFila(int fila) {
+        if (fila < 0 || fila >= transaccionesActuales.size()) {
+            return null;
+        }
+        return transaccionesActuales.get(fila);
+    }
+
     private void buscar() {
-        if (dao == null) {
+        if (daoTransaccion == null) {
             JOptionPane.showMessageDialog(this, "No hay conexión con la base de datos.", "Error", JOptionPane.ERROR_MESSAGE);
             return;
         }
@@ -236,7 +242,7 @@ public class ModificacionVentasForm extends JFrame {
         String textoId = txtFiltroId.getText().trim();
         if (!textoId.isEmpty()) {
             try {
-                numeroVenta = Integer.valueOf(textoId);
+                numeroVenta = Integer.parseInt(textoId);
             } catch (NumberFormatException ex) {
                 JOptionPane.showMessageDialog(this, "El número de venta debe ser numérico.", "Error de formato", JOptionPane.ERROR_MESSAGE);
                 return;
@@ -246,12 +252,32 @@ public class ModificacionVentasForm extends JFrame {
         String estado = valorFiltro(comboFiltroEstado);
         String metodo = valorFiltro(comboFiltroMetodo);
 
-        List<Document> ventas = dao.listar(numeroVenta, estado, metodo);
-        modeloTabla.setVentas(ventas);
+        List<Document> transacciones = daoTransaccion.listar(numeroVenta, estado, metodo);
+        modeloTabla.setRowCount(0);
+        transaccionesActuales.clear();
+        for (Document t : transacciones) {
+            transaccionesActuales.add(t);
+            Integer idVentaValor = t.getInteger("idVenta");
+            int idVenta = idVentaValor != null ? idVentaValor.intValue() : 0;
+            String metodoPago = t.getString("metodo");
+            BigDecimal monto = t.get("monto") instanceof BigDecimal ? (BigDecimal) t.get("monto")
+                    : t.get("monto") instanceof org.bson.types.Decimal128
+                            ? ((org.bson.types.Decimal128) t.get("monto")).bigDecimalValue()
+                            : new BigDecimal(String.valueOf(t.get("monto")));
+            String est = t.getString("estado");
+            Date fecha = t.getDate("fecha");
+            modeloTabla.addRow(new Object[]{
+                    idVenta,
+                    metodoPago,
+                    "$" + MetodoPago.formatear(monto),
+                    est,
+                    fecha == null ? "" : FORMATO_FECHA.format(fecha)
+            });
+        }
         limpiarSeleccion();
-        lblResumen.setText(ventas.isEmpty()
-                ? "No se encontraron ventas con esos filtros."
-                : ventas.size() + " item(s) de venta encontrados (seleccione una fila para editarla).");
+        lblResumen.setText(transacciones.isEmpty()
+                ? "No se encontraron transacciones con esos filtros."
+                : transacciones.size() + " transacción(es) encontrada(s) (seleccione una fila para modificarla).");
     }
 
     private void limpiarFiltros() {
@@ -261,81 +287,106 @@ public class ModificacionVentasForm extends JFrame {
         buscar();
     }
 
-    private void mostrarVenta(Document documento) {
-        Venta venta = Venta.fromDocument(documento);
-        txtIdVenta.setText(documento.getInteger("id") == null ? "-" : String.valueOf(documento.getInteger("id")));
-        txtNombre.setText(venta.getNombre());
-        txtPrecio.setText(venta.getPrecio().toPlainString());
-        txtCantidad.setText(String.valueOf(venta.getCantidad()));
-        txtTotal.setText("$" + MetodoPago.formatear(venta.getTotal()));
+    private void mostrarTransaccion(Document documento) {
+        if (documento == null) {
+            return;
+        }
+        Integer idVentaDocumento = documento.getInteger("idVenta");
+        int idVenta = idVentaDocumento == null ? 0 : idVentaDocumento;
+        txtIdVenta.setText(String.valueOf(idVenta));
+        Object montoObj = documento.get("monto");
+        BigDecimal monto = montoObj instanceof BigDecimal ? (BigDecimal) montoObj
+                : montoObj instanceof org.bson.types.Decimal128 ? ((org.bson.types.Decimal128) montoObj).bigDecimalValue()
+                : new BigDecimal(String.valueOf(montoObj));
+        txtMonto.setText("$" + MetodoPago.formatear(monto));
         seleccionar(comboEstado, documento.getString("estado"));
-        seleccionar(comboMetodo, documento.getString("metodoPago"));
+        seleccionar(comboMetodo, documento.getString("metodo"));
+    }
+
+    private void asegurarSeleccion() {
+        if (transaccionSeleccionada == null && tablaTransacciones.getSelectedRow() != -1) {
+            int fila = tablaTransacciones.convertRowIndexToModel(tablaTransacciones.getSelectedRow());
+            transaccionSeleccionada = obtenerTransaccionDeFila(fila);
+        }
     }
 
     private void guardarCambios() {
-        if (ventaSeleccionada == null) {
-            JOptionPane.showMessageDialog(this, "Seleccione una venta de la tabla para modificarla.", "Advertencia", JOptionPane.WARNING_MESSAGE);
+        asegurarSeleccion();
+        if (transaccionSeleccionada == null) {
+            JOptionPane.showMessageDialog(this, "Seleccione una transacción de la tabla para modificarla.", "Advertencia", JOptionPane.WARNING_MESSAGE);
             return;
         }
-        if (dao == null) {
+        if (daoTransaccion == null || daoVenta == null) {
             JOptionPane.showMessageDialog(this, "No hay conexión con la base de datos.", "Error", JOptionPane.ERROR_MESSAGE);
             return;
         }
 
-        String nombre = txtNombre.getText().trim();
-        String precioStr = txtPrecio.getText().trim();
-        String cantidadStr = txtCantidad.getText().trim();
-        if (nombre.isEmpty() || precioStr.isEmpty() || cantidadStr.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Por favor, complete todos los campos.", "Advertencia", JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-
-        BigDecimal precio;
-        int cantidad;
+        Integer idVenta = transaccionSeleccionada.getInteger("idVenta");
+        int numeroVenta = idVenta != null ? idVenta : 0;
+        ObjectId idTransaccion = transaccionSeleccionada.getObjectId("_id");
+        String nuevoEstadoStr = (String) comboEstado.getSelectedItem();
+        String nuevoMetodo = (String) comboMetodo.getSelectedItem();
+        EstadoPago nuevoEstado;
         try {
-            precio = new BigDecimal(precioStr);
-            cantidad = Integer.parseInt(cantidadStr);
-        } catch (NumberFormatException ex) {
-            JOptionPane.showMessageDialog(this, "El precio y la cantidad deben ser valores numéricos válidos.", "Error de formato", JOptionPane.ERROR_MESSAGE);
-            return;
-        }
-        if (precio.signum() < 0 || cantidad <= 0) {
-            JOptionPane.showMessageDialog(this, "El precio no puede ser negativo y la cantidad debe ser mayor que cero.", "Advertencia", JOptionPane.WARNING_MESSAGE);
+            nuevoEstado = EstadoPago.valueOf(nuevoEstadoStr);
+        } catch (IllegalArgumentException ex) {
+            JOptionPane.showMessageDialog(this, "Estado inválido.", "Error", JOptionPane.ERROR_MESSAGE);
             return;
         }
 
-        ObjectId id = ventaSeleccionada.getObjectId("_id");
-        Venta venta = new Venta(nombre, precio, cantidad);
-        boolean actualizado = dao.actualizar(id, venta,
-                (String) comboEstado.getSelectedItem(), (String) comboMetodo.getSelectedItem());
+        boolean txOk = daoTransaccion.actualizar(idTransaccion, nuevoEstado, nuevoMetodo);
+        boolean ventaOk = daoVenta.cambiarEstado(numeroVenta, nuevoEstado, nuevoMetodo);
 
-        if (!actualizado) {
-            JOptionPane.showMessageDialog(this, "No se pudo actualizar la venta seleccionada.", "Error", JOptionPane.ERROR_MESSAGE);
+        if (!txOk && !ventaOk) {
+            JOptionPane.showMessageDialog(this, "No se pudo actualizar la transacción.", "Error", JOptionPane.ERROR_MESSAGE);
             return;
         }
 
-        JOptionPane.showMessageDialog(this, "Venta modificada correctamente.", "Venta actualizada", JOptionPane.INFORMATION_MESSAGE);
+        JOptionPane.showMessageDialog(this, "Transacción modificada correctamente.", "Transacción actualizada", JOptionPane.INFORMATION_MESSAGE);
         buscar();
     }
 
-    private void actualizarTotal() {
-        try {
-            BigDecimal precio = new BigDecimal(txtPrecio.getText().trim());
-            int cantidad = Integer.parseInt(txtCantidad.getText().trim());
-            txtTotal.setText(cantidad <= 0 ? "" : "$" + MetodoPago.formatear(precio.multiply(BigDecimal.valueOf(cantidad))));
-        } catch (NumberFormatException e) {
-            txtTotal.setText("");
+    private void anularVenta() {
+        asegurarSeleccion();
+        if (transaccionSeleccionada == null) {
+            JOptionPane.showMessageDialog(this, "Seleccione una transacción de la tabla para anularla.", "Advertencia", JOptionPane.WARNING_MESSAGE);
+            return;
         }
+        if (daoTransaccion == null || daoVenta == null) {
+            JOptionPane.showMessageDialog(this, "No hay conexión con la base de datos.", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        Integer idVenta = transaccionSeleccionada.getInteger("idVenta");
+        int numeroVenta = (idVenta != null) ? idVenta : 0;
+        String estadoActual = transaccionSeleccionada.getString("estado");
+        if ("PROCESADO".equals(estadoActual)) {
+            int confirmProc = JOptionPane.showConfirmDialog(this,
+                    "La venta N° " + numeroVenta + " está PROCESADA. ¿Anularla de todos modos?",
+                    "Confirmar anulación", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+            if (confirmProc != JOptionPane.YES_OPTION) {
+                return;
+            }
+        }
+        int confirm = JOptionPane.showConfirmDialog(this,
+                "¿Anular la venta N° " + numeroVenta + " y su transacción? Esta acción no se puede deshacer.",
+                "Confirmar anulación", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+        if (confirm != JOptionPane.YES_OPTION) {
+            return;
+        }
+
+        daoTransaccion.eliminarPorVenta(numeroVenta);
+        daoVenta.eliminarVenta(numeroVenta);
+
+        JOptionPane.showMessageDialog(this, "Venta N° " + numeroVenta + " anulada.", "Anulación", JOptionPane.INFORMATION_MESSAGE);
+        buscar();
     }
 
     private void limpiarSeleccion() {
-        ventaSeleccionada = null;
-        tablaVentas.clearSelection();
+        transaccionSeleccionada = null;
+        tablaTransacciones.clearSelection();
         txtIdVenta.setText("");
-        txtNombre.setText("");
-        txtPrecio.setText("");
-        txtCantidad.setText("");
-        txtTotal.setText("");
+        txtMonto.setText("");
         comboEstado.setSelectedIndex(0);
         comboMetodo.setSelectedIndex(0);
     }
@@ -431,4 +482,5 @@ public class ModificacionVentasForm extends JFrame {
         boton.setFont(FUENTE_ETIQUETA);
         return boton;
     }
+
 }

@@ -4,6 +4,7 @@ package com.ues.procesamiento_pago.dao;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 import org.bson.Document;
 import org.bson.conversions.Bson;
@@ -17,9 +18,11 @@ import com.ues.procesamiento_pago.config.MongoDBConnection;
 
 public class VentaDAO {
     private final MongoCollection<Document> coleccion;
+    private final TransaccionDAO transaccionDAO;
 
     public VentaDAO(MongoDBConnection mongoDB) {
         this.coleccion = mongoDB.getDatabase().getCollection("ventas");
+        this.transaccionDAO = new TransaccionDAO(mongoDB);
     }
 
     public void insertar(Venta venta, EstadoPago estado, String metodoPago, String usuario) {
@@ -38,13 +41,12 @@ public class VentaDAO {
         return ultimaVenta.getInteger("id") + 1;
     }
 
-    // lista las ventas filtradas por numero de venta, estado y metodo de pago (null = sin filtro)
+    // lista las ventas filtradas por numero de venta, estado y metodo de pago 
     public List<Document> listar(Integer numeroVenta, String estado, String metodoPago) {
         return listar(null, numeroVenta, estado, metodoPago, null, null);
     }
 
-    // lista las ventas filtrando por identificador de transaccion (_id), numero de venta,
-    // estado, metodo de pago y rango de fechas (null = sin filtro)
+    
     public List<Document> listar(ObjectId idTransaccion, Integer numeroVenta, String estado,
             String metodoPago, Date desde, Date hasta) {
         List<Bson> condiciones = new ArrayList<>();
@@ -60,17 +62,34 @@ public class VentaDAO {
         if (metodoPago != null && !metodoPago.isEmpty()) {
             condiciones.add(Filters.eq("metodoPago", metodoPago));
         }
-        if (desde != null && hasta != null) {
-            condiciones.add(Filters.and(Filters.gte("fecha", desde), Filters.lte("fecha", hasta)));
-        } else if (desde != null) {
-            condiciones.add(Filters.gte("fecha", desde));
-        } else if (hasta != null) {
-            condiciones.add(Filters.lte("fecha", hasta));
+        // la fecha se guarda en la transaccion: el rango se resuelve con sus ventas
+        if (desde != null || hasta != null) {
+            condiciones.add(Filters.in("id", transaccionDAO.numerosVentaEnRango(desde, hasta)));
         }
         Bson filtro = condiciones.isEmpty() ? new Document() : Filters.and(condiciones);
-        return coleccion.find(filtro)
-                .sort(new Document("id", 1).append("fecha", 1))
+        List<Document> ventas = coleccion.find(filtro)
+                .sort(new Document("id", 1))
                 .into(new ArrayList<>());
+        completarFechas(ventas);
+        return ventas;
+    }
+
+    // la fecha vive en la transaccion, se agrega a cada item para mostrarla
+    private void completarFechas(List<Document> ventas) {
+        List<Integer> numeros = new ArrayList<>();
+        for (Document venta : ventas) {
+            Integer numero = venta.getInteger("id");
+            if (numero != null && !numeros.contains(numero)) {
+                numeros.add(numero);
+            }
+        }
+        Map<Integer, Date> fechas = transaccionDAO.fechasPorVenta(numeros);
+        for (Document venta : ventas) {
+            Date fecha = fechas.get(venta.getInteger("id"));
+            if (fecha != null) {
+                venta.put("fecha", fecha);
+            }
+        }
     }
 
     // actualiza los datos de un item de venta ya registrado
@@ -82,6 +101,19 @@ public class VentaDAO {
                 .append("estado", estado)
                 .append("metodoPago", metodoPago);
         return coleccion.updateOne(Filters.eq("_id", id), new Document("$set", cambios))
+                .getMatchedCount() > 0;
+    }
+
+    // elimina todos los items de una venta 
+    public boolean eliminarVenta(int numeroVenta) {
+        return coleccion.deleteMany(Filters.eq("id", numeroVenta)).getDeletedCount() > 0;
+    }
+
+    // aplica el estado y el metodo de pago a todos los items de una venta
+    public boolean cambiarEstado(int numeroVenta, EstadoPago estado, String metodoPago) {
+        Document cambios = new Document("estado", estado.name())
+                .append("metodoPago", metodoPago);
+        return coleccion.updateMany(Filters.eq("id", numeroVenta), new Document("$set", cambios))
                 .getMatchedCount() > 0;
     }
 }

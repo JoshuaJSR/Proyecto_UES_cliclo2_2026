@@ -15,8 +15,10 @@ import com.mongodb.client.MongoCollection;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
+import com.ues.procesamiento_pago.Model.EstadoPago;
 import com.ues.procesamiento_pago.Model.Transaccion;
 import com.ues.procesamiento_pago.config.MongoDBConnection;
+
 public class TransaccionDAO {
     private final MongoCollection<Document> coleccion;
 
@@ -33,7 +35,7 @@ public class TransaccionDAO {
         return id;
     }
 
-    // busca una transaccion por su identificador (null si no existe)
+    // busca una transaccion por su identificador
     public Document buscar(ObjectId idTransaccion) {
         if (idTransaccion == null) {
             return null;
@@ -41,14 +43,14 @@ public class TransaccionDAO {
         return coleccion.find(Filters.eq("_id", idTransaccion)).first();
     }
 
-    // transaccion principal asociada a una venta 
+    // transaccion principal asociada a una venta (la ultima registrada)
     public Document buscarPorVenta(int numeroVenta) {
         return coleccion.find(Filters.eq("idVenta", numeroVenta))
                 .sort(new Document("fecha", -1))
                 .first();
     }
 
-    // numeros de venta cuyas transacciones caen en el rango de fechas
+    
     public List<Integer> numerosVentaEnRango(Date desde, Date hasta) {
         List<Integer> numeros = new ArrayList<>();
         for (Document transaccion : coleccion.find(filtroFecha(desde, hasta))
@@ -61,7 +63,7 @@ public class TransaccionDAO {
         return numeros;
     }
 
-    // fecha de la transaccion principal de cada venta
+    // fecha de la transaccion principal de cada venta 
     public Map<Integer, Date> fechasPorVenta(List<Integer> numerosVenta) {
         Map<Integer, Date> fechas = new HashMap<>();
         if (numerosVenta == null || numerosVenta.isEmpty()) {
@@ -95,6 +97,48 @@ public class TransaccionDAO {
                         Accumulators.sum("importe", "$monto")),
                 Aggregates.sort(new Document("_id.metodo", 1).append("_id.estado", 1)));
         return coleccion.aggregate(etapas).into(new ArrayList<>());
+    }
+
+    // lista transacciones filtradas por numero de venta, estado y metodo
+    public List<Document> listar(Integer numeroVenta, String estado, String metodoPago) {
+        List<Bson> condiciones = new ArrayList<>();
+        if (numeroVenta != null) {
+            condiciones.add(Filters.eq("idVenta", numeroVenta));
+        }
+        if (estado != null && !estado.isEmpty()) {
+            condiciones.add(Filters.eq("estado", estado));
+        }
+        if (metodoPago != null && !metodoPago.isEmpty()) {
+            condiciones.add(Filters.eq("metodo", metodoPago));
+        }
+        Bson filtro = condiciones.isEmpty() ? new Document() : Filters.and(condiciones);
+        return coleccion.find(filtro)
+                .sort(new Document("fecha", -1))
+                .into(new ArrayList<>());
+    }
+
+    // actualiza estado y metodo de pago de una transaccion
+    public boolean actualizar(ObjectId id, EstadoPago estado, String metodoPago) {
+        if (id == null) {
+            return false;
+        }
+        Document cambios = new Document("estado", estado == null ? null : estado.name())
+                .append("metodo", metodoPago);
+        return coleccion.updateOne(Filters.eq("_id", id), new Document("$set", cambios))
+                .getMatchedCount() > 0;
+    }
+
+    // elimina una transaccion por su identificador
+    public boolean eliminar(ObjectId id) {
+        if (id == null) {
+            return false;
+        }
+        return coleccion.deleteOne(Filters.eq("_id", id)).getDeletedCount() > 0;
+    }
+
+    // elimina todas las transacciones asociadas a una venta
+    public boolean eliminarPorVenta(int numeroVenta) {
+        return coleccion.deleteMany(Filters.eq("idVenta", numeroVenta)).getDeletedCount() > 0;
     }
 
     private static Bson filtroFecha(Date desde, Date hasta) {
