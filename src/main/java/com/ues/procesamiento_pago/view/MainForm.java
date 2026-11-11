@@ -76,7 +76,9 @@ public class MainForm extends JFrame {
 
         JMenu menuConsultas = crearMenu("Consultas");
         JMenuItem itemConsultarVentas = crearItem("Consultar ventas");
+        JMenuItem itemResumenPagos = crearItem("Resumen de pagos");
         menuConsultas.add(itemConsultarVentas);
+        menuConsultas.add(itemResumenPagos);
 
         menuBar.add(menuOpciones);
         menuBar.add(menuMantenimiento);
@@ -106,6 +108,10 @@ public class MainForm extends JFrame {
 
         itemConsultarVentas.addActionListener(e -> {
             new ConsultaVentasForm(this.mongoDB).setVisible(true);
+        });
+
+        itemResumenPagos.addActionListener(e -> {
+            new ResumenPagosForm(this.mongoDB).setVisible(true);
         });
     }
 
