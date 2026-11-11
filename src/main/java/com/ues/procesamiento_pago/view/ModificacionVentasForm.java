@@ -258,7 +258,7 @@ public class ModificacionVentasForm extends JFrame {
         for (Document t : transacciones) {
             transaccionesActuales.add(t);
             Integer idVentaValor = t.getInteger("idVenta");
-            int idVenta = idVentaValor != null ? idVentaValor.intValue() : 0;
+            int idVenta = idVentaValor != null ? idVentaValor : 0;
             String metodoPago = t.getString("metodo");
             BigDecimal monto = t.get("monto") instanceof BigDecimal ? (BigDecimal) t.get("monto")
                     : t.get("monto") instanceof org.bson.types.Decimal128

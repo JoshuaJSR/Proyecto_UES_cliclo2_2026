@@ -40,8 +40,13 @@ import com.ues.procesamiento_pago.dao.TransaccionDAO;
 import com.ues.procesamiento_pago.dao.VentaDAO;
 import com.ues.procesamiento_pago.util.Estilos;
 
+/**
+ * Pago de ventas pendientes: busca una venta que quedo PENDIENTE (no se
+ * capturaron los datos del metodo de pago al registrarla) y procesa su cobro.
+ * Una venta que ya fue pagada (PROCESADO) no se puede volver a pagar.
+ */
 public class PagoVentaPendienteForm extends JFrame {
-    private static final String[] COLUMNAS = {"ITEM", "PRODUCTO", "CANTIDAD", "PRECIO UNITARIO", "TOTAL"};
+    private static final String[] COLUMNAS = {"N° VENTA", "MÉTODO DE PAGO", "MONTO", "ESTADO", "FECHA"};
 
     private static final String[] METODOS = {
         "Efectivo", "Pago con tarjeta", "Pago Electronico", "Transferencia Bancaria"
@@ -56,14 +61,13 @@ public class PagoVentaPendienteForm extends JFrame {
     private JTextField txtNumeroVenta;
     private JButton btnBuscar;
     private DefaultTableModel modeloTabla;
-    private JTable tablaItems;
+    private JTable tablaTransaccion;
     private JComboBox<String> comboMetodos;
     private JButton btnProcesar;
     private JLabel lblEstado;
     private JLabel lblTotal;
     private JLabel lblResumen;
 
-    // items de la venta buscada y su numero 
     private List<Document> itemsVenta = new ArrayList<>();
     private int numeroVentaCargada = -1;
 
@@ -159,24 +163,24 @@ public class PagoVentaPendienteForm extends JFrame {
             }
         };
 
-        tablaItems = new JTable(modeloTabla);
-        tablaItems.setBackground(new Color(25, 25, 25));
-        tablaItems.setForeground(Color.WHITE);
-        tablaItems.setGridColor(new Color(60, 60, 60));
-        tablaItems.setSelectionBackground(new Color(45, 120, 85));
-        tablaItems.setSelectionForeground(Color.WHITE);
-        tablaItems.setRowHeight(24);
-        tablaItems.getTableHeader().setBackground(Color.BLACK);
-        tablaItems.getTableHeader().setForeground(Color.WHITE);
-        tablaItems.getTableHeader().setFont(FUENTE_ETIQUETA);
+        tablaTransaccion = new JTable(modeloTabla);
+        tablaTransaccion.setBackground(new Color(25, 25, 25));
+        tablaTransaccion.setForeground(Color.WHITE);
+        tablaTransaccion.setGridColor(new Color(60, 60, 60));
+        tablaTransaccion.setSelectionBackground(new Color(45, 120, 85));
+        tablaTransaccion.setSelectionForeground(Color.WHITE);
+        tablaTransaccion.setRowHeight(24);
+        tablaTransaccion.getTableHeader().setBackground(Color.BLACK);
+        tablaTransaccion.getTableHeader().setForeground(Color.WHITE);
+        tablaTransaccion.getTableHeader().setFont(FUENTE_ETIQUETA);
 
-        int[] anchos = {60, 360, 90, 150, 140};
+        int[] anchos = {90, 180, 140, 120, 180};
         for (int i = 0; i < anchos.length; i++) {
-            tablaItems.getColumnModel().getColumn(i).setPreferredWidth(anchos[i]);
+            tablaTransaccion.getColumnModel().getColumn(i).setPreferredWidth(anchos[i]);
         }
 
         JPanel panel = crearPanel(new BorderLayout(0, 4));
-        panel.add(new JScrollPane(tablaItems), BorderLayout.CENTER);
+        panel.add(new JScrollPane(tablaTransaccion), BorderLayout.CENTER);
         return panel;
     }
 
@@ -268,19 +272,26 @@ public class PagoVentaPendienteForm extends JFrame {
 
         String estado = items.get(0).getString("estado");
         BigDecimal total = BigDecimal.ZERO;
-        int numeroItem = 1;
         for (Document item : items) {
-            Venta venta = Venta.fromDocument(item);
-            BigDecimal totalItem = venta.getTotal();
-            total = total.add(totalItem);
-            modeloTabla.addRow(new Object[] {
-                numeroItem++,
-                venta.getNombre(),
-                venta.getCantidad(),
-                "$" + MetodoPago.formatear(venta.getPrecio()),
-                "$" + MetodoPago.formatear(totalItem)
-            });
+            total = total.add(Venta.fromDocument(item).getTotal());
         }
+
+        Document transaccion = transaccionDAO == null ? null : transaccionDAO.buscarPorVenta(numero);
+        String metodo = transaccion == null ? "-" : transaccion.getString("metodo");
+        Object montoObj = transaccion == null ? total : transaccion.get("monto");
+        BigDecimal monto = montoObj instanceof BigDecimal ? (BigDecimal) montoObj
+                : montoObj instanceof org.bson.types.Decimal128 ? ((org.bson.types.Decimal128) montoObj).bigDecimalValue()
+                : total;
+        java.util.Date fecha = transaccion == null ? null : transaccion.getDate("fecha");
+        java.text.SimpleDateFormat fmt = new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm");
+
+        modeloTabla.addRow(new Object[] {
+            numero,
+            metodo == null ? "-" : metodo,
+            "$" + MetodoPago.formatear(monto),
+            estado == null ? "-" : estado,
+            fecha == null ? "" : fmt.format(fecha)
+        });
 
         numeroVentaCargada = numero;
         lblEstado.setText(estado == null ? "-" : estado);
@@ -292,8 +303,8 @@ public class PagoVentaPendienteForm extends JFrame {
             lblResumen.setText("La venta N° " + numero + " ya fue pagada: no se puede cobrar de nuevo.");
         } else if (EstadoPago.PENDIENTE.name().equals(estado)) {
             btnProcesar.setEnabled(true);
-            lblResumen.setText("Venta N° " + numero + " con " + items.size()
-                    + " producto(s) pendiente(s) de pago. Seleccione el método y procese el pago.");
+            lblResumen.setText("Transacción de la venta N° " + numero
+                    + " pendiente de pago. Seleccione el método y procese el pago.");
         } else {
             btnProcesar.setEnabled(false);
             lblResumen.setText("La venta N° " + numero + " está " + estado
@@ -315,7 +326,7 @@ public class PagoVentaPendienteForm extends JFrame {
         int numero = numeroVentaCargada;
         List<Document> items;
         try {
-            // el estado se vuelve a leer: evita cobrar dos veces la misma venta
+            // el estado se vuelve a leer, evita cobrar dos veces la misma venta
             items = dao.listar(null, numero, null, null, null, null);
         } catch (MongoException ex) {
             JOptionPane.showMessageDialog(this, "Error al consultar la base de datos: " + ex.getMessage(),
@@ -370,7 +381,7 @@ public class PagoVentaPendienteForm extends JFrame {
                         metodoPago.comprobante(transaccion) + "\nVenta N° " + numero + " pagada.",
                         "Pago registrado", JOptionPane.INFORMATION_MESSAGE);
             } else {
-                // rechazado: la venta sigue PENDIENTE para poder reintentar el cobro
+                // rechazado, la venta sigue PENDIENTE para poder reintentar el cobro
                 String motivo = transaccion.getMensaje() != null ? transaccion.getMensaje() : "Pago no confirmado.";
                 JOptionPane.showMessageDialog(this,
                         "El pago fue rechazado: " + motivo + "\nLa venta N° " + numero + " sigue PENDIENTE.",
