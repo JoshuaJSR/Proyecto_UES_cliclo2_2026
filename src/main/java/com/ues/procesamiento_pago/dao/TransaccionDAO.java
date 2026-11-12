@@ -43,7 +43,7 @@ public class TransaccionDAO {
         return coleccion.find(Filters.eq("_id", idTransaccion)).first();
     }
 
-    // transaccion principal asociada a una venta (la ultima registrada)
+    // transaccion principal asociada a una venta 
     public Document buscarPorVenta(int numeroVenta) {
         return coleccion.find(Filters.eq("idVenta", numeroVenta))
                 .sort(new Document("fecha", -1))

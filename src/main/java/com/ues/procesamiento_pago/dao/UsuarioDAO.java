@@ -1,6 +1,5 @@
 package com.ues.procesamiento_pago.dao;
 
-//clase que concentra el acceso a la Mongo
 import org.bson.Document;
 
 import com.mongodb.client.MongoCollection;

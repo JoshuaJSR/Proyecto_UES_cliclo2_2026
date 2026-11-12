@@ -62,7 +62,7 @@ public class VentaDAO {
         if (metodoPago != null && !metodoPago.isEmpty()) {
             condiciones.add(Filters.eq("metodoPago", metodoPago));
         }
-        // la fecha se guarda en la transaccion: el rango se resuelve con sus ventas
+        // la fecha se guarda en la transaccion, el rango se resuelve con sus ventas
         if (desde != null || hasta != null) {
             condiciones.add(Filters.in("id", transaccionDAO.numerosVentaEnRango(desde, hasta)));
         }
@@ -74,7 +74,6 @@ public class VentaDAO {
         return ventas;
     }
 
-    // la fecha vive en la transaccion, se agrega a cada item para mostrarla
     private void completarFechas(List<Document> ventas) {
         List<Integer> numeros = new ArrayList<>();
         for (Document venta : ventas) {
