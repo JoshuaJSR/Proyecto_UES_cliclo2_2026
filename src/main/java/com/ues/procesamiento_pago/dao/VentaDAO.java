@@ -12,16 +12,25 @@ import org.bson.types.ObjectId;
 
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.FindOneAndUpdateOptions;
+import com.mongodb.client.model.ReturnDocument;
+import com.mongodb.client.model.UpdateOptions;
 import com.ues.procesamiento_pago.Model.EstadoPago;
 import com.ues.procesamiento_pago.Model.Venta;
 import com.ues.procesamiento_pago.config.MongoDBConnection;
 
 public class VentaDAO {
+    // coleccion donde se guarda el ultimo numero de venta entregado
+    private static final String COLECCION_CONTADORES = "contadores";
+    private static final String CONTADOR_NUMERO_VENTA = "numeroVenta";
+
     private final MongoCollection<Document> coleccion;
+    private final MongoCollection<Document> contadores;
     private final TransaccionDAO transaccionDAO;
 
     public VentaDAO(MongoDBConnection mongoDB) {
         this.coleccion = mongoDB.getDatabase().getCollection("ventas");
+        this.contadores = mongoDB.getDatabase().getCollection(COLECCION_CONTADORES);
         this.transaccionDAO = new TransaccionDAO(mongoDB);
     }
 
@@ -29,16 +38,41 @@ public class VentaDAO {
         coleccion.insertOne(venta.toDocument(estado, metodoPago, usuario));
     }
 
-    // calcula el proximo numero de venta, 1 si no hay ventas registradas
+    // proximo numero de venta sin reservarlo, solo sirve para mostrarlo en pantalla
     public int siguienteNumeroVenta() {
+        Document contador = contadores.find(Filters.eq("_id", CONTADOR_NUMERO_VENTA)).first();
+        int reservado = contador == null ? 0 : contador.getInteger("seq", 0);
+        return Math.max(reservado, ultimoNumeroUsado()) + 1;
+    }
+
+    public int reservarNumeroVenta() {
+        asegurarContador();
+        Document contador = contadores.findOneAndUpdate(
+                Filters.eq("_id", CONTADOR_NUMERO_VENTA),
+                new Document("$inc", new Document("seq", 1)),
+                new FindOneAndUpdateOptions().upsert(true).returnDocument(ReturnDocument.AFTER));
+        Integer secuencia = contador == null ? null : contador.getInteger("seq");
+        return secuencia == null ? 1 : secuencia;
+    }
+
+    private void asegurarContador() {
+        if (contadores.find(Filters.eq("_id", CONTADOR_NUMERO_VENTA)).first() != null) {
+            return;
+        }
+        contadores.updateOne(Filters.eq("_id", CONTADOR_NUMERO_VENTA),
+                new Document("$max", new Document("seq", ultimoNumeroUsado())),
+                new UpdateOptions().upsert(true));
+    }
+
+    private int ultimoNumeroUsado() {
         Document ultimaVenta = coleccion.find()
                 .sort(new Document("id", -1))
                 .limit(1)
                 .first();
         if (ultimaVenta == null || ultimaVenta.getInteger("id") == null) {
-            return 1;
+            return 0;
         }
-        return ultimaVenta.getInteger("id") + 1;
+        return ultimaVenta.getInteger("id");
     }
 
     // lista las ventas filtradas por numero de venta, estado y metodo de pago 
@@ -62,7 +96,6 @@ public class VentaDAO {
         if (metodoPago != null && !metodoPago.isEmpty()) {
             condiciones.add(Filters.eq("metodoPago", metodoPago));
         }
-        // la fecha se guarda en la transaccion, el rango se resuelve con sus ventas
         if (desde != null || hasta != null) {
             condiciones.add(Filters.in("id", transaccionDAO.numerosVentaEnRango(desde, hasta)));
         }

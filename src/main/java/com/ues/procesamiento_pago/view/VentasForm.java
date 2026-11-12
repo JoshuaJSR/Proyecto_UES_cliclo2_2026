@@ -64,6 +64,7 @@ public class VentasForm extends JFrame {
     private final TransaccionDAO transaccionDAO;
     private final List<Venta> ventasPendientes = new ArrayList<>();
 
+    // la venta se registra sin metodo de pago: se define al momento de cobrarla
     private static final String METODO_PENDIENTE = "Sin definir";
 
     private static final Color COLOR_FONDO = Color.DARK_GRAY;
@@ -188,6 +189,10 @@ public class VentasForm extends JFrame {
 
     private JPanel crearPanelAviso() {
         JPanel panel = crearPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        JLabel aviso = new JLabel("La venta se registra sin pago: se cobra después en \"Pago de ventas pendientes\".");
+        aviso.setForeground(COLOR_TEXTO_SECUNDARIO);
+        aviso.setFont(FUENTE_ETIQUETA);
+        panel.add(aviso);
         return panel;
     }
 
@@ -249,6 +254,18 @@ public class VentasForm extends JFrame {
             BigDecimal precio = new BigDecimal(precioStr);
             int cantidad = Integer.parseInt(cantidadStr);
 
+            if (precio.compareTo(BigDecimal.ZERO) <= 0) {
+                JOptionPane.showMessageDialog(this, "El precio debe ser mayor que cero.", "Advertencia", JOptionPane.WARNING_MESSAGE);
+                txtPrecio.requestFocusInWindow();
+                return;
+            }
+
+            if (cantidad <= 0) {
+                JOptionPane.showMessageDialog(this, "La cantidad debe ser mayor que cero.", "Advertencia", JOptionPane.WARNING_MESSAGE);
+                txtCantidad.requestFocusInWindow();
+                return;
+            }
+
             if (indiceFilaSeleccionada == -1) {
                 // se agrega nuevo registro si no hay ninguno seleccionado
                 modeloTabla.agregar(new Venta(nombre, precio, cantidad));
@@ -287,7 +304,16 @@ public class VentasForm extends JFrame {
             return;
         }
 
-        int numeroRegistrado = numeroVentaActual;
+        int numeroRegistrado;
+        try {
+            // el numero se reserva al registrar la venta, no al abrir el formulario
+            numeroRegistrado = dao.reservarNumeroVenta();
+        } catch (MongoException ex) {
+            JOptionPane.showMessageDialog(this, "No se pudo asignar el número de venta: " + ex.getMessage(),
+                    "Error de conexión", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        txtNumeroVenta.setText(String.valueOf(numeroRegistrado));
         BigDecimal totalRegistrado = totalVenta();
 
         Transaccion transaccion = new Transaccion(numeroRegistrado, METODO_PENDIENTE,
