@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -35,7 +36,7 @@ public class TransaccionDAO {
         return id;
     }
 
-    // busca una transaccion por su identificador
+    // buscar una transaccion por su identificador
     public Document buscar(ObjectId idTransaccion) {
         if (idTransaccion == null) {
             return null;
@@ -63,7 +64,6 @@ public class TransaccionDAO {
         return numeros;
     }
 
-    // fecha de la transaccion principal de cada venta 
     public Map<Integer, Date> fechasPorVenta(List<Integer> numerosVenta) {
         Map<Integer, Date> fechas = new HashMap<>();
         if (numerosVenta == null || numerosVenta.isEmpty()) {
@@ -79,6 +79,22 @@ public class TransaccionDAO {
             }
         }
         return fechas;
+    }
+
+    // ultima transaccion registrada para cada venta 
+    public Map<Integer, Document> ultimaTransaccionPorVenta(List<Integer> numerosVenta) {
+        Map<Integer, Document> resultado = new LinkedHashMap<>();
+        if (numerosVenta == null || numerosVenta.isEmpty()) {
+            return resultado;
+        }
+        for (Document t : coleccion.find(Filters.in("idVenta", numerosVenta))
+                .sort(new Document("fecha", -1))) {
+            Integer n = t.getInteger("idVenta");
+            if (n != null && !resultado.containsKey(n)) {
+                resultado.put(n, t);
+            }
+        }
+        return resultado;
     }
 
     // transacciones registradas en un rango de fechas
@@ -117,7 +133,7 @@ public class TransaccionDAO {
                 .into(new ArrayList<>());
     }
 
-    // actualiza estado y metodo de pago de una transaccion
+    // actualizar estado y metodo de pago de una transaccion
     public boolean actualizar(ObjectId id, EstadoPago estado, String metodoPago) {
         if (id == null) {
             return false;
@@ -128,7 +144,7 @@ public class TransaccionDAO {
                 .getMatchedCount() > 0;
     }
 
-    // guarda el resultado del cobro: estado, metodo, importe, fecha real del pago y motivo
+    // guardar el resultado del cobro, estado, metodo, importe, fecha del pago y motivo
     public boolean registrarResultado(ObjectId id, Transaccion transaccion) {
         if (id == null || transaccion == null) {
             return false;
@@ -141,14 +157,14 @@ public class TransaccionDAO {
         if (transaccion.getMensaje() != null) {
             cambios.append("mensaje", transaccion.getMensaje());
         } else {
-            // un cobro aprobado no debe conservar el motivo de un rechazo anterior
+
             actualizacion.append("$unset", new Document("mensaje", ""));
         }
         actualizacion.append("$set", cambios);
         return coleccion.updateOne(Filters.eq("_id", id), actualizacion).getMatchedCount() > 0;
     }
 
-    // elimina una transaccion por su identificador
+    // eliminar una transaccion por su identificador
     public boolean eliminar(ObjectId id) {
         if (id == null) {
             return false;
@@ -156,7 +172,7 @@ public class TransaccionDAO {
         return coleccion.deleteOne(Filters.eq("_id", id)).getDeletedCount() > 0;
     }
 
-    // elimina todas las transacciones asociadas a una venta
+    // eliminar todas las transacciones asociadas a una venta
     public boolean eliminarPorVenta(int numeroVenta) {
         return coleccion.deleteMany(Filters.eq("idVenta", numeroVenta)).getDeletedCount() > 0;
     }

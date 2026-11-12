@@ -11,13 +11,19 @@ import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.LayoutManager;
 import java.math.BigDecimal;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
+import javax.swing.JFormattedTextField;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
@@ -25,9 +31,15 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
+import javax.swing.ListSelectionModel;
+import javax.swing.event.ListSelectionEvent;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.text.DateFormatter;
+import javax.swing.text.DefaultFormatterFactory;
+import javax.swing.text.MaskFormatter;
 
 import org.bson.Document;
+import org.bson.types.Decimal128;
 
 import com.mongodb.MongoException;
 import com.ues.procesamiento_pago.Model.EstadoPago;
@@ -53,17 +65,22 @@ public class PagoVentaPendienteForm extends JFrame {
         "Transferencia Bancaria", new String[]{"Número de cuenta origen:", "Número de cuenta destino:"}
     );
 
-    private JTextField txtNumeroVenta;
-    private JButton btnBuscar;
+    private JTextField txtFiltroId;
+    private JFormattedTextField txtFechaDesde;
+    private JFormattedTextField txtFechaHasta;
+    private JButton btnFiltrar;
+    private JButton btnLimpiar;
     private DefaultTableModel modeloTabla;
     private JTable tablaTransaccion;
     private JComboBox<String> comboMetodos;
     private JButton btnProcesar;
     private JLabel lblEstado;
     private JLabel lblTotal;
+    private JLabel lblInfo;
     private JLabel lblResumen;
 
-    private List<Document> itemsVenta = new ArrayList<>();
+    private final Map<Integer, List<Document>> itemsPorVenta = new LinkedHashMap<>();
+    private final List<Document> itemsVenta = new ArrayList<>();
     private int numeroVentaCargada = -1;
 
     private final VentaDAO dao;
@@ -92,7 +109,7 @@ public class PagoVentaPendienteForm extends JFrame {
         this.transaccionDAO = dao != null ? new TransaccionDAO(mongoDB) : null;
 
         setTitle("Pago de ventas pendientes");
-        setSize(1120, 720);
+        setSize(1120, 740);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setResizable(false);
@@ -101,8 +118,16 @@ public class PagoVentaPendienteForm extends JFrame {
         conectarEventos();
 
         if (numeroVenta != null) {
-            txtNumeroVenta.setText(String.valueOf(numeroVenta));
-            buscar();
+            txtFiltroId.setText(String.valueOf(numeroVenta));
+            aplicarFiltro();
+        } else {
+            cargarListaInicial();
+        }
+    }
+
+    private void cargarListaInicial() {
+        if (dao != null) {
+            aplicarFiltro();
         }
     }
 
@@ -115,7 +140,7 @@ public class PagoVentaPendienteForm extends JFrame {
         lblTitulo.setForeground(Color.WHITE);
 
         agregar(panel, lblTitulo, 0, 0, new Insets(0, 0, 10, 0));
-        agregar(panel, crearPanelBusqueda(), 1, 0, MARGEN);
+        agregar(panel, crearPanelFiltros(), 1, 0, MARGEN);
         agregar(panel, crearPanelDatosVenta(), 2, 0, new Insets(8, 0, 6, 0));
         agregar(panel, crearPanelTabla(), 3, 1, SIN_MARGEN);
         agregar(panel, crearPanelPago(), 4, 0, new Insets(8, 0, 4, 0));
@@ -124,26 +149,63 @@ public class PagoVentaPendienteForm extends JFrame {
         return panel;
     }
 
-    private JPanel crearPanelBusqueda() {
-        JPanel panel = crearPanel(new FlowLayout(FlowLayout.LEFT, 10, 4));
+    private JPanel crearPanelFiltros() {
+        JPanel barra = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
+        barra.setBackground(COLOR_FONDO);
 
-        txtNumeroVenta = campo();
-        txtNumeroVenta.setPreferredSize(new Dimension(110, 32));
-        btnBuscar = boton("BUSCAR VENTA", COLOR_VERDE, Color.BLACK);
+        txtFiltroId = campo();
+        txtFiltroId.setPreferredSize(new Dimension(90, 32));
+        
+        try {
+            // Máscara estricta para dd/MM/yyyy
+            MaskFormatter mascaraFecha = new MaskFormatter("##/##/####");
+            mascaraFecha.setPlaceholderCharacter('_'); 
 
-        JLabel lblAyuda = new JLabel("Se pueden cobrar ventas PENDIENTES o RECHAZADAS; las PROCESADAS ya están pagadas.");
-        lblAyuda.setForeground(COLOR_TEXTO_SECUNDARIO);
-        lblAyuda.setFont(FUENTE_ETIQUETA);
+            txtFechaDesde = new JFormattedTextField(mascaraFecha);
+            txtFechaHasta = new JFormattedTextField(mascaraFecha);
 
-        panel.add(etiqueta("N° DE VENTA:"));
-        panel.add(txtNumeroVenta);
-        panel.add(btnBuscar);
-        panel.add(lblAyuda);
-        return panel;
+            SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
+            String fechaActual = sdf.format(new Date());
+
+            txtFechaDesde.setText(fechaActual);
+            txtFechaHasta.setText(fechaActual);
+
+            txtFechaDesde.setPreferredSize(new Dimension(130, 32));
+            txtFechaHasta.setPreferredSize(new Dimension(130, 32));
+        } catch (ParseException e) {
+            txtFechaDesde = new JFormattedTextField();
+            txtFechaHasta = new JFormattedTextField();
+        }
+
+        btnFiltrar = boton("FILTRAR", COLOR_VERDE, Color.BLACK);
+        btnLimpiar = boton("LIMPIAR", COLOR_ROJO, Color.WHITE);
+        btnLimpiar.setPreferredSize(new Dimension(110, 32));
+
+        barra.add(etiqueta("N° VENTA:"));
+        barra.add(txtFiltroId);
+        barra.add(etiqueta("Desde:"));
+        barra.add(txtFechaDesde);
+        barra.add(etiqueta("Hasta:"));
+        barra.add(txtFechaHasta);
+        barra.add(btnFiltrar);
+        barra.add(btnLimpiar);
+
+        JLabel lblHint = new JLabel(
+            "Listado de ventas PENDIENTES o RECHAZADAS. Filtre por número de venta y/o rango de fecha.");
+        lblHint.setForeground(COLOR_TEXTO_SECUNDARIO);
+        lblHint.setFont(FUENTE_ETIQUETA);
+
+        JPanel section = new JPanel(new BorderLayout(0, 4));
+        section.setBackground(COLOR_FONDO);
+        section.add(barra, BorderLayout.CENTER);
+        section.add(lblHint, BorderLayout.SOUTH);
+        return section;
     }
 
     private JPanel crearPanelDatosVenta() {
-        JPanel panel = crearPanel(new FlowLayout(FlowLayout.LEFT, 10, 4));
+        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 4));
+        panel.setBackground(COLOR_FONDO);
+
         lblEstado = new JLabel("-");
         lblEstado.setForeground(Color.WHITE);
         lblEstado.setFont(FUENTE_DESTACADA);
@@ -156,6 +218,13 @@ public class PagoVentaPendienteForm extends JFrame {
         panel.add(javax.swing.Box.createHorizontalStrut(20));
         panel.add(etiquetaDestacada("TOTAL A PAGAR:"));
         panel.add(lblTotal);
+
+        lblInfo = new JLabel("-");
+        lblInfo.setForeground(COLOR_TEXTO_SECUNDARIO);
+        lblInfo.setFont(FUENTE_ETIQUETA);
+        panel.add(javax.swing.Box.createHorizontalStrut(20));
+        panel.add(lblInfo);
+
         return panel;
     }
 
@@ -177,6 +246,7 @@ public class PagoVentaPendienteForm extends JFrame {
         tablaTransaccion.getTableHeader().setBackground(Color.BLACK);
         tablaTransaccion.getTableHeader().setForeground(Color.WHITE);
         tablaTransaccion.getTableHeader().setFont(FUENTE_ETIQUETA);
+        tablaTransaccion.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 
         int[] anchos = {90, 180, 140, 120, 180};
         for (int i = 0; i < anchos.length; i++) {
@@ -189,7 +259,8 @@ public class PagoVentaPendienteForm extends JFrame {
     }
 
     private JPanel crearPanelPago() {
-        JPanel panel = crearPanel(new FlowLayout(FlowLayout.RIGHT, 10, 4));
+        JPanel panel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 4));
+        panel.setBackground(COLOR_FONDO);
 
         comboMetodos = new JComboBox<>(METODOS);
         comboMetodos.setPreferredSize(new Dimension(200, 30));
@@ -207,8 +278,9 @@ public class PagoVentaPendienteForm extends JFrame {
     }
 
     private JPanel crearPanelResumen() {
-        JPanel panel = crearPanel(new BorderLayout());
-        lblResumen = new JLabel("Busque una venta por su número para ver su detalle.");
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBackground(COLOR_FONDO);
+        lblResumen = new JLabel("Seleccione una venta de la lista para ver su detalle.");
         lblResumen.setForeground(COLOR_TEXTO_SECUNDARIO);
         lblResumen.setFont(FUENTE_ETIQUETA);
         panel.add(lblResumen, BorderLayout.WEST);
@@ -216,7 +288,8 @@ public class PagoVentaPendienteForm extends JFrame {
     }
 
     private JPanel crearPanelBotones() {
-        JPanel panel = crearPanel(new BorderLayout());
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBackground(COLOR_FONDO);
         JButton btnCerrar = boton("Cerrar", COLOR_ROJO, Color.WHITE);
         btnCerrar.addActionListener(e -> dispose());
         panel.add(btnCerrar, BorderLayout.EAST);
@@ -224,80 +297,181 @@ public class PagoVentaPendienteForm extends JFrame {
     }
 
     private void conectarEventos() {
-        btnBuscar.addActionListener(e -> buscar());
-        txtNumeroVenta.addActionListener(e -> buscar());
+        btnFiltrar.addActionListener(e -> aplicarFiltro());
+
+        btnLimpiar.addActionListener(e -> {
+            txtFiltroId.setText("");
+            SimpleDateFormat sdf = new SimpleDateFormat("ddMMyyyy");
+            String fechaActual = sdf.format(new Date());
+            txtFechaDesde.setText(fechaActual);
+            txtFechaHasta.setText(fechaActual);
+            aplicarFiltro();
+        });
         btnProcesar.addActionListener(e -> procesarPago());
+
+        txtFiltroId.addActionListener(e -> aplicarFiltro());
+        txtFechaDesde.addActionListener(e -> aplicarFiltro());
+        txtFechaHasta.addActionListener(e -> aplicarFiltro());
+
+        tablaTransaccion.getSelectionModel().addListSelectionListener((ListSelectionEvent e) -> {
+            if (e.getValueIsAdjusting()) {
+                return;
+            }
+            int fila = tablaTransaccion.getSelectedRow();
+            if (fila < 0) {
+                limpiarSeleccion();
+            } else {
+                int numero = (int) modeloTabla.getValueAt(fila, 0);
+                mostrarSeleccion(numero);
+            }
+        });
     }
 
-    private void buscar() {
+    private void aplicarFiltro() {
         if (dao == null) {
-            JOptionPane.showMessageDialog(this, "No hay conexión con la base de datos.", "Error", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "No hay conexión con la base de datos.", "Error",
+                    JOptionPane.ERROR_MESSAGE);
             return;
         }
 
-        String texto = txtNumeroVenta.getText().trim();
-        if (texto.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Ingrese el número de la venta que desea pagar.",
-                    "Advertencia", JOptionPane.WARNING_MESSAGE);
-            return;
+        String idTexto = txtFiltroId.getText().trim();
+        if (!idTexto.isEmpty()) {
+            try {
+                Integer.valueOf(idTexto);
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(this, "El número de venta debe ser numérico.",
+                        "Error de formato", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
         }
 
-        int numero;
-        try {
-            numero = Integer.parseInt(texto);
-        } catch (NumberFormatException ex) {
-            JOptionPane.showMessageDialog(this, "El número de venta debe ser numérico.",
+        Date desde = parsearFecha(txtFechaDesde.getText().trim());
+        if (txtFechaDesde.getText().trim().isEmpty()) {
+            desde = null;
+        } else if (desde == null) {
+            JOptionPane.showMessageDialog(this, "Formato de fecha 'Desde' inválido. Use dd/MM/yyyy.",
                     "Error de formato", JOptionPane.ERROR_MESSAGE);
             return;
         }
 
+        Date hasta = parsearFecha(txtFechaHasta.getText().trim());
+        if (txtFechaHasta.getText().trim().isEmpty()) {
+            hasta = null;
+        } else if (hasta == null) {
+            JOptionPane.showMessageDialog(this, "Formato de fecha 'Hasta' inválido. Use dd/MM/yyyy.",
+                    "Error de formato", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        if (hasta != null) {
+            hasta = hastaFinDeDia(hasta);
+        }
+
+        Integer idFiltro = idTexto.isEmpty() ? null : Integer.valueOf(idTexto);
+
         try {
-            mostrarVenta(numero, dao.listar(null, numero, null, null, null, null));
+            listarPendientesYRechazados(idFiltro, desde, hasta);
         } catch (MongoException ex) {
             JOptionPane.showMessageDialog(this, "Error al consultar la base de datos: " + ex.getMessage(),
                     "Error de conexión", JOptionPane.ERROR_MESSAGE);
         }
     }
 
-    // carga en pantalla el detalle de la venta y habilita el cobro solo si esta PENDIENTE
-    private void mostrarVenta(int numero, List<Document> items) {
-        itemsVenta = items;
-        numeroVentaCargada = -1;
-        modeloTabla.setRowCount(0);
+    private void listarPendientesYRechazados(Integer idFiltro, Date desde, Date hasta) {
+        List<Document> todos = new ArrayList<>();
+        for (String estado : new String[]{EstadoPago.PENDIENTE.name(), EstadoPago.RECHAZADO.name()}) {
+            todos.addAll(dao.listar(null, idFiltro, estado, null, desde, hasta));
+        }
 
-        if (items.isEmpty()) {
-            lblEstado.setText("-");
-            lblEstado.setForeground(Color.WHITE);
-            lblTotal.setText("$0.00");
-            lblResumen.setText("No existe una venta con el número " + numero + ".");
-            btnProcesar.setEnabled(false);
+        Map<Integer, List<Document>> porId = new LinkedHashMap<>();
+        for (Document item : todos) {
+            Integer n = item.getInteger("id");
+            if (n != null) {
+                porId.computeIfAbsent(n, k -> new ArrayList<>()).add(item);
+            }
+        }
+        itemsPorVenta.clear();
+        itemsPorVenta.putAll(porId);
+
+        List<Integer> ids = new ArrayList<>(porId.keySet());
+        Map<Integer, Document> ultimas = transaccionDAO.ultimaTransaccionPorVenta(ids);
+
+        modeloTabla.setRowCount(0);
+        BigDecimal granTotal = BigDecimal.ZERO;
+
+        for (Integer n : ids) {
+            List<Document> items = porId.get(n);
+            BigDecimal total = totalVenta(items);
+            Document ult = ultimas.get(n);
+
+            String metodo = ult != null ? ult.getString("metodo") : "-";
+            Object montoObj = ult != null ? ult.get("monto") : null;
+            BigDecimal monto;
+            if (montoObj == null) {
+                monto = total;
+            } else {
+                switch (montoObj) {
+                    case BigDecimal decimal -> monto = decimal;
+                    case Decimal128 decimal128 -> monto = decimal128.bigDecimalValue();
+                    default -> monto = total;
+                }
+            }
+
+            Date fecha = ult != null ? ult.getDate("fecha") : null;
+            String estado = items.get(0).getString("estado");
+            SimpleDateFormat fmt = new SimpleDateFormat("dd/MM/yyyy HH:mm");
+
+            modeloTabla.addRow(new Object[]{
+                n,
+                metodo,
+                "$" + MetodoPago.formatear(monto),
+                estado == null ? "-" : estado,
+                fecha == null ? "" : fmt.format(fecha)
+            });
+
+            granTotal = granTotal.add(total);
+        }
+
+        int cuenta = ids.size();
+        lblInfo.setText(cuenta + " venta(s) | Total: $" + MetodoPago.formatear(granTotal));
+
+        Integer seleccionado = numeroVentaCargada;
+        if (ids.contains(seleccionado)) {
+            seleccionarFila(seleccionado);
+            mostrarSeleccion(seleccionado);
+        } else if (idFiltro != null && ids.size() == 1) {
+            Integer unico = ids.get(0);
+            seleccionarFila(unico);
+            mostrarSeleccion(unico);
+        } else {
+            limpiarSeleccion();
+        }
+    }
+
+    private void seleccionarFila(int numero) {
+        for (int r = 0; r < modeloTabla.getRowCount(); r++) {
+            Object valor = modeloTabla.getValueAt(r, 0);
+            if (valor instanceof Integer && ((Integer) valor) == numero) {
+                tablaTransaccion.setRowSelectionInterval(r, r);
+                tablaTransaccion.scrollRectToVisible(tablaTransaccion.getCellRect(r, 0, true));
+                break;
+            }
+        }
+    }
+
+    private void mostrarSeleccion(int numero) {
+        List<Document> items = itemsPorVenta.get(numero);
+        if (items == null || items.isEmpty()) {
+            limpiarSeleccion();
             return;
         }
 
-        String estado = items.get(0).getString("estado");
-        BigDecimal total = BigDecimal.ZERO;
-        for (Document item : items) {
-            total = total.add(Venta.fromDocument(item).getTotal());
-        }
-
-        Document transaccion = transaccionDAO == null ? null : transaccionDAO.buscarPorVenta(numero);
-        String metodo = transaccion == null ? "-" : transaccion.getString("metodo");
-        Object montoObj = transaccion == null ? total : transaccion.get("monto");
-        BigDecimal monto = montoObj instanceof BigDecimal ? (BigDecimal) montoObj
-                : montoObj instanceof org.bson.types.Decimal128 ? ((org.bson.types.Decimal128) montoObj).bigDecimalValue()
-                : total;
-        java.util.Date fecha = transaccion == null ? null : transaccion.getDate("fecha");
-        java.text.SimpleDateFormat fmt = new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm");
-
-        modeloTabla.addRow(new Object[] {
-            numero,
-            metodo == null ? "-" : metodo,
-            "$" + MetodoPago.formatear(monto),
-            estado == null ? "-" : estado,
-            fecha == null ? "" : fmt.format(fecha)
-        });
-
+        itemsVenta.clear();
+        itemsVenta.addAll(items);
         numeroVentaCargada = numero;
+
+        String estado = items.get(0).getString("estado");
+        BigDecimal total = totalVenta(items);
+
         lblEstado.setText(estado == null ? "-" : estado);
         lblEstado.setForeground(colorEstado(estado));
         lblTotal.setText("$" + MetodoPago.formatear(total));
@@ -307,21 +481,30 @@ public class PagoVentaPendienteForm extends JFrame {
             lblResumen.setText("La venta N° " + numero + " ya fue pagada: no se puede cobrar de nuevo.");
         } else if (EstadoPago.PENDIENTE.name().equals(estado)) {
             btnProcesar.setEnabled(true);
-            lblResumen.setText("Venta N° " + numero
-                    + " pendiente de pago. Seleccione el método y procese el cobro.");
+            lblResumen.setText("Venta N° " + numero + " pendiente de pago. Seleccione el método y procese el cobro.");
         } else if (EstadoPago.RECHAZADO.name().equals(estado)) {
             btnProcesar.setEnabled(true);
-            lblResumen.setText("El último cobro de la venta N° " + numero
-                    + " fue rechazado.");
+            lblResumen.setText("El último cobro de la venta N° " + numero + " fue rechazado.");
         } else {
             btnProcesar.setEnabled(false);
             lblResumen.setText("La venta N° " + numero + " está " + estado + ": no se puede cobrar.");
         }
     }
 
+    private void limpiarSeleccion() {
+        itemsVenta.clear();
+        numeroVentaCargada = -1;
+        lblEstado.setText("-");
+        lblEstado.setForeground(Color.WHITE);
+        lblTotal.setText("$0.00");
+        btnProcesar.setEnabled(false);
+        lblResumen.setText("Seleccione una venta de la lista para ver su detalle.");
+    }
+
     private void procesarPago() {
         if (dao == null || transaccionDAO == null) {
-            JOptionPane.showMessageDialog(this, "No hay conexión con la base de datos.", "Error", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "No hay conexión con la base de datos.", "Error",
+                    JOptionPane.ERROR_MESSAGE);
             return;
         }
         if (numeroVentaCargada < 0 || itemsVenta.isEmpty()) {
@@ -333,7 +516,6 @@ public class PagoVentaPendienteForm extends JFrame {
         int numero = numeroVentaCargada;
         List<Document> items;
         try {
-            // el estado se vuelve a leer, evita cobrar dos veces la misma venta
             items = dao.listar(null, numero, null, null, null, null);
         } catch (MongoException ex) {
             JOptionPane.showMessageDialog(this, "Error al consultar la base de datos: " + ex.getMessage(),
@@ -342,18 +524,19 @@ public class PagoVentaPendienteForm extends JFrame {
         }
 
         if (items.isEmpty()) {
-            mostrarVenta(numero, items);
+            limpiarSeleccion();
             JOptionPane.showMessageDialog(this, "La venta N° " + numero + " ya no existe en la base de datos.",
                     "Venta no encontrada", JOptionPane.WARNING_MESSAGE);
+            aplicarFiltro();
             return;
         }
+
         for (Document item : items) {
             String estado = item.getString("estado");
-            // solo se bloquea una venta ya cobrada; PENDIENTE y RECHAZADO se pueden pagar
             if (EstadoPago.PROCESADO.name().equals(estado)) {
-                mostrarVenta(numero, items);
+                mostrarSeleccion(numero);
                 JOptionPane.showMessageDialog(this,
-                        "La venta N° " + numero + " ya fue pagada, cobrara de nuevo.",
+                        "La venta N° " + numero + " ya fue pagada, no podrá cobrarla de nuevo.",
                         "Pago no permitido", JOptionPane.WARNING_MESSAGE);
                 return;
             }
@@ -374,7 +557,6 @@ public class PagoVentaPendienteForm extends JFrame {
         Transaccion transaccion = metodoPago.procesar(resumen);
         transaccion.setMensaje(metodoPago.getMensajeError());
 
-        // la venta toma el resultado del cobro, PROCESADO si se pago, RECHAZADO si hubo error
         EstadoPago resultado = transaccion.getEstado();
 
         try {
@@ -392,6 +574,8 @@ public class PagoVentaPendienteForm extends JFrame {
                 return;
             }
 
+            aplicarFiltro();
+
             if (resultado == EstadoPago.PROCESADO) {
                 JOptionPane.showMessageDialog(this,
                         metodoPago.comprobante(transaccion) + "\nVenta N° " + numero + " pagada.",
@@ -406,17 +590,6 @@ public class PagoVentaPendienteForm extends JFrame {
         } catch (MongoException ex) {
             JOptionPane.showMessageDialog(this, "Error al guardar en la base de datos: " + ex.getMessage(),
                     "Error de conexión", JOptionPane.ERROR_MESSAGE);
-            return;
-        }
-
-        mostrarVenta(numero, recargar(numero));
-    }
-
-    private List<Document> recargar(int numero) {
-        try {
-            return dao.listar(null, numero, null, null, null, null);
-        } catch (MongoException ex) {
-            return new ArrayList<>();
         }
     }
 
@@ -465,6 +638,32 @@ public class PagoVentaPendienteForm extends JFrame {
                         "Error de formato", JOptionPane.ERROR_MESSAGE);
             }
         }
+    }
+
+    private static Date parsearFecha(String texto) {
+    if (texto == null || texto.trim().isEmpty()) {
+        return null;
+    }
+    String limpio = texto.replace("_", "").trim();
+    if (limpio.equals("/")) { 
+        return null;
+    }
+    try {
+        SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
+        sdf.setLenient(false);
+        return sdf.parse(limpio);
+    } catch (ParseException e) {
+        return null;
+    }
+}
+    private static Date hastaFinDeDia(Date d) {
+        java.util.Calendar c = java.util.Calendar.getInstance();
+        c.setTime(d);
+        c.set(java.util.Calendar.HOUR_OF_DAY, 23);
+        c.set(java.util.Calendar.MINUTE, 59);
+        c.set(java.util.Calendar.SECOND, 59);
+        c.set(java.util.Calendar.MILLISECOND, 999);
+        return c.getTime();
     }
 
     private static Color colorEstado(String estado) {
