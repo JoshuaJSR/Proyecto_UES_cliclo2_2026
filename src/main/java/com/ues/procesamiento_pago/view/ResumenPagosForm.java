@@ -3,6 +3,7 @@ package com.ues.procesamiento_pago.view;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
+import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.GridBagConstraints;
@@ -21,7 +22,9 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableColumn;
 
 import org.bson.Document;
 
@@ -64,7 +67,7 @@ public class ResumenPagosForm extends JFrame {
         }
 
         setTitle("Resumen de pagos");
-        setSize(1060, 560);
+        setSize(1020, 410);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setResizable(false);
@@ -78,20 +81,15 @@ public class ResumenPagosForm extends JFrame {
 
     private JPanel crearContenido() {
         JPanel panel = crearPanel(new GridBagLayout());
-        panel.setBorder(BorderFactory.createEmptyBorder(12, 18, 16, 18));
+        panel.setBorder(BorderFactory.createEmptyBorder(16, 20, 16, 20));
 
         JLabel lblTitulo = new JLabel("RESUMEN DE PAGOS", JLabel.CENTER);
-        lblTitulo.setFont(new Font("SansSerif", Font.BOLD, 26));
+        lblTitulo.setFont(new Font("SansSerif", Font.BOLD, 22));
         lblTitulo.setForeground(Color.WHITE);
 
-        JLabel lblAyuda = new JLabel("Cantidades e importes por método de pago. Los pagos rechazados no se suman a los ingresos aprobados.");
-        lblAyuda.setForeground(COLOR_TEXTO_SECUNDARIO);
-        lblAyuda.setFont(FUENTE_ETIQUETA);
-
-        agregar(panel, lblTitulo, 0, 0, new Insets(0, 0, 4, 0));
-        agregar(panel, lblAyuda, 1, 0, new Insets(0, 0, 10, 0));
-        agregar(panel, crearPanelTabla(), 2, 1, new Insets(0, 0, 0, 0));
-        agregar(panel, crearPanelBotones(), 3, 0, new Insets(8, 0, 0, 0));
+        agregar(panel, lblTitulo, 0, 0, new Insets(0, 0, 12, 0));
+        agregar(panel, crearPanelTabla(), 1, 0, new Insets(0, 0, 12, 0));
+        agregar(panel, crearPanelBotones(), 2, 0, new Insets(0, 0, 0, 0));
         return panel;
     }
 
@@ -107,7 +105,6 @@ public class ResumenPagosForm extends JFrame {
             @Override
             public Component prepareRenderer(javax.swing.table.TableCellRenderer renderer, int fila, int columna) {
                 Component componente = super.prepareRenderer(renderer, fila, columna);
-                // la fila de totales se destaca
                 if (fila == getRowCount() - 1) {
                     componente.setFont(componente.getFont().deriveFont(Font.BOLD));
                     componente.setBackground(new Color(45, 45, 45));
@@ -117,23 +114,42 @@ public class ResumenPagosForm extends JFrame {
                 return componente;
             }
         };
+        
         tablaResumen.setBackground(new Color(25, 25, 25));
         tablaResumen.setForeground(Color.WHITE);
         tablaResumen.setGridColor(new Color(60, 60, 60));
         tablaResumen.setSelectionBackground(new Color(45, 120, 85));
         tablaResumen.setSelectionForeground(Color.WHITE);
-        tablaResumen.setRowHeight(26);
+        tablaResumen.setRowHeight(28);
         tablaResumen.getTableHeader().setBackground(Color.BLACK);
         tablaResumen.getTableHeader().setForeground(Color.WHITE);
         tablaResumen.getTableHeader().setFont(FUENTE_ETIQUETA);
+        tablaResumen.getTableHeader().setReorderingAllowed(false);
+        tablaResumen.getTableHeader().setResizingAllowed(false);
 
-        int[] anchos = {210, 130, 110, 150, 120, 160, 110};
-        for (int i = 0; i < anchos.length; i++) {
-            tablaResumen.getColumnModel().getColumn(i).setPreferredWidth(anchos[i]);
+        DefaultTableCellRenderer tcrDerecha = new DefaultTableCellRenderer();
+        tcrDerecha.setHorizontalAlignment(JLabel.RIGHT);
+        for (int i = 1; i < COLUMNAS.length; i++) {
+            tablaResumen.getColumnModel().getColumn(i).setCellRenderer(tcrDerecha);
         }
 
-        JPanel panel = crearPanel(new BorderLayout(0, 4));
-        panel.add(new JScrollPane(tablaResumen), BorderLayout.CENTER);
+        int[] anchos = {210, 115, 105, 140, 110, 140, 105};
+        for (int i = 0; i < anchos.length; i++) {
+            TableColumn columna = tablaResumen.getColumnModel().getColumn(i);
+            columna.setMinWidth(anchos[i]);
+            columna.setMaxWidth(anchos[i]);
+            columna.setPreferredWidth(anchos[i]);
+        }
+
+        int alturaFijaTabla = tablaResumen.getTableHeader().getPreferredSize().height + (tablaResumen.getRowHeight() * 5) + 3;
+        
+        JScrollPane scrollPane = new JScrollPane(tablaResumen);
+        scrollPane.setPreferredSize(new Dimension(935, alturaFijaTabla));
+        scrollPane.setMinimumSize(new Dimension(935, alturaFijaTabla));
+        scrollPane.setMaximumSize(new Dimension(935, alturaFijaTabla));
+
+        JPanel panel = crearPanel(new BorderLayout(0, 6));
+        panel.add(scrollPane, BorderLayout.CENTER);
 
         JPanel panelResumen = crearPanel(new BorderLayout(0, 2));
         lblIngresos = new JLabel(" ");
@@ -145,12 +161,13 @@ public class ResumenPagosForm extends JFrame {
         panelResumen.add(lblIngresos, BorderLayout.NORTH);
         panelResumen.add(lblDetalle, BorderLayout.SOUTH);
         panel.add(panelResumen, BorderLayout.SOUTH);
+        
         return panel;
     }
 
     private JPanel crearPanelBotones() {
         JPanel panel = crearPanel(new BorderLayout());
-        JPanel izquierda = crearPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        JPanel izquierda = crearPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
         JButton btnActualizar = boton("ACTUALIZAR", COLOR_VERDE, Color.BLACK);
         btnActualizar.addActionListener(e -> cargarResumen());
         izquierda.add(btnActualizar);
@@ -170,14 +187,12 @@ public class ResumenPagosForm extends JFrame {
             return;
         }
 
-        //los metodos se muestran siempre, aunque no tengan operaciones
         Map<String, Acumulado> acumulados = new LinkedHashMap<>();
         for (String metodo : METODOS) {
             acumulados.put(metodo, new Acumulado());
         }
 
         try {
-            //cantidad por metodo, estado e importes
             for (Document fila : transaccionDAO.resumenPorMetodoYEstado()) {
                 Document grupo = (Document) fila.get("_id");
                 String metodo = grupo == null || grupo.getString("metodo") == null
@@ -207,7 +222,6 @@ public class ResumenPagosForm extends JFrame {
         mostrarResumen(acumulados);
     }
 
-    //presentacion del resumen, una fila por metodo y una fila de totales
     private void mostrarResumen(Map<String, Acumulado> acumulados) {
         modeloTabla.setRowCount(0);
 
@@ -251,11 +265,10 @@ public class ResumenPagosForm extends JFrame {
         lblIngresos.setText("Ingresos aprobados: $" + MetodoPago.formatear(aprobado));
         lblDetalle.setText(transacciones == 0
                 ? "No hay transacciones registradas."
-                : procesadas + " aprobadas, " + rechazadas + " rechazadas  y "
+                : procesadas + " aprobadas, " + rechazadas + " rechazadas y "
                         + pendientes + " pendientes. Importe rechazado: $" + MetodoPago.formatear(rechazado) + ".");
     }
 
-    // acumulado de una fila del resumen
     private static final class Acumulado {
         private int procesadas;
         private int rechazadas;
