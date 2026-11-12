@@ -8,11 +8,11 @@ import org.bson.types.ObjectId;
 
 public class Transaccion {
     private ObjectId id;
-    private final int idVenta;
-    private final String metodo;
-    private final BigDecimal monto;
-    private final Date fecha;
-    private final EstadoPago estado;
+    private int idVenta;
+    private String metodo;
+    private BigDecimal monto;
+    private Date fecha;
+    private EstadoPago estado;
     private String mensaje;
 
     public Transaccion(int idVenta, String metodo, BigDecimal monto, EstadoPago estado) {
@@ -23,7 +23,6 @@ public class Transaccion {
         this.estado = estado;
     }
 
-    // identificador que asigna MongoDB al guardar la transaccion
     public ObjectId getId() {
         return id;
     }
@@ -32,25 +31,44 @@ public class Transaccion {
         this.id = id;
     }
 
-    // venta a la que corresponde la transaccion
     public int getIdVenta() {
         return idVenta;
+    }
+
+    public void setIdVenta(int idVenta) {
+        this.idVenta = idVenta;
     }
 
     public String getMetodo() {
         return metodo;
     }
 
+    public void setMetodo(String metodo) {
+        this.metodo = metodo;
+    }
+
     public BigDecimal getMonto() {
         return monto;
+    }
+
+    public void setMonto(BigDecimal monto) {
+        this.monto = monto;
     }
 
     public Date getFecha() {
         return fecha;
     }
 
+    public void setFecha(Date fecha) {
+        this.fecha = fecha;
+    }
+
     public EstadoPago getEstado() {
         return estado;
+    }
+
+    public void setEstado(EstadoPago estado) {
+        this.estado = estado;
     }
 
     public String getMensaje() {
@@ -64,13 +82,13 @@ public class Transaccion {
 
     // Mapea la transaccion a un Document de la coleccion transacciones
     public Document toDocument() {
-        Document documento = new Document("idVenta", idVenta)
-                .append("metodo", metodo)
-                .append("monto", monto)
-                .append("fecha", fecha)
-                .append("estado", estado == null ? null : estado.name());
-        if (mensaje != null) {
-            documento.append("mensaje", mensaje);
+        Document documento = new Document("idVenta", getIdVenta())
+                .append("metodo", getMetodo())
+                .append("monto", getMonto())
+                .append("fecha", getFecha())
+                .append("estado", getEstado() == null ? null : getEstado().name());
+        if (getMensaje() != null) {
+            documento.append("mensaje", getMensaje());
         }
         return documento;
     }

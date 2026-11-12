@@ -7,18 +7,18 @@ import org.bson.types.Decimal128;
 
 public final class Venta {
     private int id;
-    private final String nombre;
-    private final BigDecimal precio;
-    private final int cantidad;
-    private final BigDecimal total;
-    
+    private String nombre;
+    private BigDecimal precio;
+    private int cantidad;
+    private BigDecimal total;
+
     public Venta(String nombre, BigDecimal precio, int cantidad) {
         this.nombre = nombre;
         this.precio = precio;
         this.cantidad = cantidad;
         this.total = calcularTotal(cantidad, precio);
     }
-    
+
     //calcular total
     public BigDecimal calcularTotal(int cantidad, BigDecimal precio){
         return precio.multiply(BigDecimal.valueOf(cantidad));
@@ -37,16 +37,32 @@ public final class Venta {
         return nombre;
     }
 
+    public void setNombre(String nombre) {
+        this.nombre = nombre;
+    }
+
     public BigDecimal getPrecio() {
         return precio;
+    }
+
+    public void setPrecio(BigDecimal precio) {
+        this.precio = precio;
     }
 
     public int getCantidad() {
         return cantidad;
     }
 
+    public void setCantidad(int cantidad) {
+        this.cantidad = cantidad;
+    }
+
     public BigDecimal getTotal() {
         return total;
+    }
+
+    public void setTotal(BigDecimal total) {
+        this.total = total;
     }
 
     //Reconstruye una venta a partir de un documento de la coleccion ventas
@@ -77,11 +93,11 @@ public final class Venta {
 
     //Mapea la venta a un Document de MongoDB para guardarlo en la coleccion ventas
     public Document toDocument(EstadoPago estado, String metodoPago, String usuario) {
-        return new Document("id", id)
-                .append("nombre", nombre)
-                .append("precio", precio)
-                .append("cantidad", cantidad)
-                .append("total", total)
+        return new Document("id", getId())
+                .append("nombre", getNombre())
+                .append("precio", getPrecio())
+                .append("cantidad", getCantidad())
+                .append("total", getTotal())
                 .append("estado", estado.name())
                 .append("metodoPago", metodoPago)
                 .append("usuario", usuario);
