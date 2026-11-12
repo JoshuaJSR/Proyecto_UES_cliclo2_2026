@@ -25,6 +25,7 @@ public class MainForm extends JFrame {
 
         setTitle("Sistema de procesamiento de pagos");
         setExtendedState(JFrame.MAXIMIZED_BOTH);
+        setUndecorated(true); 
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
@@ -78,10 +79,8 @@ public class MainForm extends JFrame {
         menuMovimientos.add(itemModificacionVentas);
 
         JMenu menuConsultas = crearMenu("Consultas");
-        JMenuItem itemConsultarVentas = crearItem("Consultar ventas");
         JMenuItem itemResumenPagos = crearItem("Resumen de pagos");
         JMenuItem itemMovimientos = crearItem("Consultas de movimientos de venta");
-        menuConsultas.add(itemConsultarVentas);
         menuConsultas.add(itemMovimientos);
         menuConsultas.add(itemResumenPagos);
 
@@ -109,10 +108,6 @@ public class MainForm extends JFrame {
 
         itemModificacionVentas.addActionListener(e -> {
             new ModificacionVentasForm(this.mongoDB).setVisible(true);
-        });
-
-        itemConsultarVentas.addActionListener(e -> {
-            new ConsultaVentasForm(this.mongoDB).setVisible(true);
         });
 
         itemMovimientos.addActionListener(e -> {

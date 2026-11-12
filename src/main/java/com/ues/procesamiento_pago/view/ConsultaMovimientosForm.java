@@ -14,9 +14,11 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
+import java.util.Arrays;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
+import javax.swing.JComboBox;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
@@ -32,6 +34,7 @@ import javax.swing.table.DefaultTableModel;
 import org.bson.Document;
 
 import com.mongodb.MongoException;
+import com.ues.procesamiento_pago.Model.EstadoPago;
 import com.ues.procesamiento_pago.Model.Venta;
 import com.ues.procesamiento_pago.Strategy.MetodoPago;
 import com.ues.procesamiento_pago.config.MongoDBConnection;
@@ -40,10 +43,15 @@ import com.ues.procesamiento_pago.dao.VentaDAO;
 import com.ues.procesamiento_pago.util.Estilos;
 
 public class ConsultaMovimientosForm extends JFrame {
+    private static final String TODOS = "Todos";
     private static final String FORMATO_FECHA = "dd/MM/yyyy";
 
+    private static final String[] METODOS = {
+        "Efectivo", "Pago con tarjeta", "Pago Electronico", "Transferencia Bancaria"
+    };
+
     private static final String[] COLUMNAS_TRANSACCIONES = {
-        "ID DE LA VENTA", "FECHA", "ESTADO", "TOTAL"
+        "ID DE LA VENTA", "FECHA", "ESTADO", "MÉTODO DE PAGO", "TOTAL"
     };
 
     private static final String[] COLUMNAS_DETALLE = {
@@ -52,6 +60,9 @@ public class ConsultaMovimientosForm extends JFrame {
 
     private JSpinner spDesde;
     private JSpinner spHasta;
+    private JTextField txtNumeroVenta;
+    private JComboBox<String> comboMetodo;
+    private JComboBox<String> comboEstado;
     private JButton btnBuscar;
 
     private DefaultTableModel modeloTablaTransacciones;
@@ -116,9 +127,13 @@ public class ConsultaMovimientosForm extends JFrame {
 
         spDesde = fecha(primerDiaDelMes());
         spHasta = fecha(fechaHoy());
+        txtNumeroVenta = campo();
+        txtNumeroVenta.setPreferredSize(new Dimension(80, 32));
+        comboMetodo = combo(METODOS);
+        comboEstado = combo(Arrays.stream(EstadoPago.values()).map(Enum::name).toArray(String[]::new));
 
-        String[] etiquetas = {"DESDE:", "HASTA:"};
-        Component[] campos = {spDesde, spHasta};
+        String[] etiquetas = {"DESDE:", "HASTA:", "N° DE VENTA:", "MÉTODO DE PAGO:", "ESTADO:"};
+        Component[] campos = {spDesde, spHasta, txtNumeroVenta, comboMetodo, comboEstado};
 
         for (int i = 0; i < etiquetas.length; i++) {
             GridBagConstraints gbcEtiqueta = new GridBagConstraints();
@@ -133,6 +148,9 @@ public class ConsultaMovimientosForm extends JFrame {
             gbcCampo.gridy = 1;
             gbcCampo.anchor = GridBagConstraints.WEST;
             gbcCampo.insets = new Insets(0, 0, 0, 10);
+            if (i == 0) {
+                gbcCampo.weightx = 0.0;
+            }
             panel.add(campos[i], gbcCampo);
         }
 
@@ -160,7 +178,7 @@ public class ConsultaMovimientosForm extends JFrame {
         JPanel panel = crearPanel(new GridBagLayout());
 
         modeloTablaTransacciones = modeloNoEditable(COLUMNAS_TRANSACCIONES);
-        tablaTransacciones = tabla(modeloTablaTransacciones, new int[] {160, 200, 130, 150});
+        tablaTransacciones = tabla(modeloTablaTransacciones, new int[] {160, 200, 130, 160, 150});
 
         modeloTablaDetalle = modeloNoEditable(COLUMNAS_DETALLE);
         tablaDetalle = tabla(modeloTablaDetalle, new int[] {70, 320, 110, 160, 150});
@@ -201,6 +219,7 @@ public class ConsultaMovimientosForm extends JFrame {
 
     private void conectarEventos() {
         btnBuscar.addActionListener(e -> buscar());
+        txtNumeroVenta.addActionListener(e -> buscar());
         // al seleccionar una transaccion se carga su detalle automaticamente
         tablaTransacciones.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
@@ -216,6 +235,7 @@ public class ConsultaMovimientosForm extends JFrame {
             return;
         }
 
+        // consultar por rango de fechas
         Date desde = inicioDelDia((Date) spDesde.getValue());
         Date hasta = finDelDia((Date) spHasta.getValue());
         if (desde.after(hasta)) {
@@ -224,6 +244,22 @@ public class ConsultaMovimientosForm extends JFrame {
             return;
         }
 
+        // consultar la venta asociada por el numero de venta
+        Integer numeroVenta = null;
+        String textoVenta = txtNumeroVenta.getText().trim();
+        if (!textoVenta.isEmpty()) {
+            try {
+                numeroVenta = Integer.valueOf(textoVenta);
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(this, "El número de venta debe ser numérico.",
+                        "Error de formato", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+        }
+
+        String metodo = valorFiltro(comboMetodo);
+        String estado = valorFiltro(comboEstado);
+
         try {
             transacciones = transaccionDAO.listarPorRango(desde, hasta);
         } catch (MongoException ex) {
@@ -231,6 +267,29 @@ public class ConsultaMovimientosForm extends JFrame {
                     "Error de conexión", JOptionPane.ERROR_MESSAGE);
             return;
         }
+
+        // aplicar filtros adicionales en memoria
+        List<Document> filtradas = new ArrayList<>();
+        for (Document transaccion : transacciones) {
+            Integer idVenta = transaccion.getInteger("idVenta");
+            if (numeroVenta != null && (idVenta == null || !idVenta.equals(numeroVenta))) {
+                continue;
+            }
+            if (estado != null) {
+                String est = transaccion.getString("estado");
+                if (!estado.equals(est)) {
+                    continue;
+                }
+            }
+            if (metodo != null) {
+                String met = transaccion.getString("metodo");
+                if (!metodo.equals(met)) {
+                    continue;
+                }
+            }
+            filtradas.add(transaccion);
+        }
+        transacciones = filtradas;
 
         modeloTablaTransacciones.setRowCount(0);
         modeloTablaDetalle.setRowCount(0);
@@ -243,6 +302,7 @@ public class ConsultaMovimientosForm extends JFrame {
                 idVenta == null ? "-" : idVenta,
                 fecha == null ? "-" : formato.format(fecha),
                 transaccion.getString("estado"),
+                transaccion.getString("metodo"),
                 "$" + MetodoPago.formatear(Venta.aBigDecimal(transaccion.get("monto")))
             });
         }
@@ -256,7 +316,7 @@ public class ConsultaMovimientosForm extends JFrame {
         }
     }
 
-    // al elegir una transaccion se listan los items de su venta
+    //al elegir una transaccion se listan los items de su venta
     private void mostrarDetalleSeleccionado() {
         modeloTablaDetalle.setRowCount(0);
 
@@ -391,6 +451,29 @@ public class ConsultaMovimientosForm extends JFrame {
         etiqueta.setForeground(COLOR_TEXTO_SECUNDARIO);
         etiqueta.setFont(FUENTE_ETIQUETA);
         return etiqueta;
+    }
+
+    private static JTextField campo() {
+        JTextField campo = new JTextField();
+        Estilos.estilarCampo(campo);
+        return campo;
+    }
+
+    private static JComboBox<String> combo(String[] valores) {
+        String[] items = new String[valores.length + 1];
+        items[0] = TODOS;
+        System.arraycopy(valores, 0, items, 1, valores.length);
+        JComboBox<String> combo = new JComboBox<>(items);
+        combo.setPreferredSize(new Dimension(180, 32));
+        combo.setBackground(Color.WHITE);
+        combo.setForeground(Color.BLACK);
+        combo.setFont(FUENTE_ETIQUETA);
+        return combo;
+    }
+
+    private String valorFiltro(JComboBox<String> combo) {
+        String valor = (String) combo.getSelectedItem();
+        return valor == null || TODOS.equals(valor) ? null : valor;
     }
 
     private static JButton boton(String texto, Color fondo, Color colorTexto) {

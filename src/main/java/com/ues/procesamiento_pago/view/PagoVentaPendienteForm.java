@@ -28,7 +28,6 @@ import javax.swing.JTextField;
 import javax.swing.table.DefaultTableModel;
 
 import org.bson.Document;
-import org.bson.types.ObjectId;
 
 import com.mongodb.MongoException;
 import com.ues.procesamiento_pago.Model.EstadoPago;
@@ -41,7 +40,11 @@ import com.ues.procesamiento_pago.dao.TransaccionDAO;
 import com.ues.procesamiento_pago.dao.VentaDAO;
 import com.ues.procesamiento_pago.util.Estilos;
 
-
+/**
+ * Pago de ventas pendientes: busca una venta que quedo PENDIENTE (no se
+ * capturaron los datos del metodo de pago al registrarla) y procesa su cobro.
+ * Una venta que ya fue pagada (PROCESADO) no se puede volver a pagar.
+ */
 public class PagoVentaPendienteForm extends JFrame {
     private static final String[] COLUMNAS = {"N° VENTA", "MÉTODO DE PAGO", "MONTO", "ESTADO", "FECHA"};
 
@@ -322,8 +325,8 @@ public class PagoVentaPendienteForm extends JFrame {
 
         int numero = numeroVentaCargada;
         List<Document> items;
-        Document transaccionExistente = transaccionDAO == null ? null : transaccionDAO.buscarPorVenta(numero);
         try {
+            // el estado se vuelve a leer, evita cobrar dos veces la misma venta
             items = dao.listar(null, numero, null, null, null, null);
         } catch (MongoException ex) {
             JOptionPane.showMessageDialog(this, "Error al consultar la base de datos: " + ex.getMessage(),
@@ -366,12 +369,7 @@ public class PagoVentaPendienteForm extends JFrame {
         transaccion.setMensaje(metodoPago.getMensajeError());
 
         try {
-            if (transaccionExistente != null) {
-                ObjectId idTransaccion = transaccionExistente.getObjectId("_id");
-                transaccionDAO.actualizar(idTransaccion, transaccion.getEstado(), metodoNombre);
-            } else {
-                transaccionDAO.insertar(transaccion);
-            }
+            transaccionDAO.insertar(transaccion);
             if (transaccion.getEstado() == EstadoPago.PROCESADO) {
                 if (!dao.cambiarEstado(numero, EstadoPago.PROCESADO, metodoNombre)) {
                     JOptionPane.showMessageDialog(this,
