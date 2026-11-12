@@ -378,10 +378,9 @@ public class PagoVentaPendienteForm extends JFrame {
         EstadoPago resultado = transaccion.getEstado();
 
         try {
-            // se reutiliza la transaccion creada al registrar la venta, una sola por venta
             Document registrada = transaccionDAO.buscarPorVenta(numero);
             if (registrada != null) {
-                transaccionDAO.actualizar(registrada.getObjectId("_id"), resultado, metodoNombre);
+                transaccionDAO.registrarResultado(registrada.getObjectId("_id"), transaccion);
             } else {
                 transaccionDAO.insertar(transaccion);
             }

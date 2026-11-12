@@ -128,6 +128,26 @@ public class TransaccionDAO {
                 .getMatchedCount() > 0;
     }
 
+    // guarda el resultado del cobro: estado, metodo, importe, fecha real del pago y motivo
+    public boolean registrarResultado(ObjectId id, Transaccion transaccion) {
+        if (id == null || transaccion == null) {
+            return false;
+        }
+        Document cambios = new Document("estado", transaccion.getEstado() == null ? null : transaccion.getEstado().name())
+                .append("metodo", transaccion.getMetodo())
+                .append("monto", transaccion.getMonto())
+                .append("fecha", transaccion.getFecha());
+        Document actualizacion = new Document();
+        if (transaccion.getMensaje() != null) {
+            cambios.append("mensaje", transaccion.getMensaje());
+        } else {
+            // un cobro aprobado no debe conservar el motivo de un rechazo anterior
+            actualizacion.append("$unset", new Document("mensaje", ""));
+        }
+        actualizacion.append("$set", cambios);
+        return coleccion.updateOne(Filters.eq("_id", id), actualizacion).getMatchedCount() > 0;
+    }
+
     // elimina una transaccion por su identificador
     public boolean eliminar(ObjectId id) {
         if (id == null) {
