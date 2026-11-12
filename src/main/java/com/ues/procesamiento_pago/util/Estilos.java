@@ -29,6 +29,13 @@ public class Estilos {
         campo.setPreferredSize(new Dimension(anchoFijo, 35));
     }
 
+    public static JTextField crearCampo(int anchoFijo) {
+        JTextField campo = new JTextField();
+        if (anchoFijo > 0) estilarCampo(campo, anchoFijo);
+        else estilarCampo(campo);
+        return campo;
+    }
+
     public static JLabel etiqueta(String texto, boolean destacada) {
         JLabel l = new JLabel(texto);
         l.setForeground(destacada ? Color.WHITE : COLOR_TEXTO_SECUNDARIO);
