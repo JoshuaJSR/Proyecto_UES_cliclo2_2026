@@ -40,11 +40,6 @@ import com.ues.procesamiento_pago.dao.TransaccionDAO;
 import com.ues.procesamiento_pago.dao.VentaDAO;
 import com.ues.procesamiento_pago.util.Estilos;
 
-/**
- * Pago de ventas pendientes: busca una venta que quedo PENDIENTE (no se
- * capturaron los datos del metodo de pago al registrarla) y procesa su cobro.
- * Una venta que ya fue pagada (PROCESADO) no se puede volver a pagar.
- */
 public class PagoVentaPendienteForm extends JFrame {
     private static final String[] COLUMNAS = {"N° VENTA", "MÉTODO DE PAGO", "MONTO", "ESTADO", "FECHA"};
 
@@ -84,6 +79,10 @@ public class PagoVentaPendienteForm extends JFrame {
     private static final Insets SIN_MARGEN = new Insets(0, 0, 0, 0);
 
     public PagoVentaPendienteForm(MongoDBConnection mongoDB) {
+        this(mongoDB, null);
+    }
+
+    public PagoVentaPendienteForm(MongoDBConnection mongoDB, Integer numeroVenta) {
         if (mongoDB != null && mongoDB.getDatabase() != null) {
             this.dao = new VentaDAO(mongoDB);
         } else {
@@ -100,6 +99,11 @@ public class PagoVentaPendienteForm extends JFrame {
 
         add(crearContenido());
         conectarEventos();
+
+        if (numeroVenta != null) {
+            txtNumeroVenta.setText(String.valueOf(numeroVenta));
+            buscar();
+        }
     }
 
     private JPanel crearContenido() {
@@ -127,7 +131,7 @@ public class PagoVentaPendienteForm extends JFrame {
         txtNumeroVenta.setPreferredSize(new Dimension(110, 32));
         btnBuscar = boton("BUSCAR VENTA", COLOR_VERDE, Color.BLACK);
 
-        JLabel lblAyuda = new JLabel("Solo se pueden pagar ventas con estado PENDIENTE.");
+        JLabel lblAyuda = new JLabel("Se pueden cobrar ventas PENDIENTES o RECHAZADAS; las PROCESADAS ya están pagadas.");
         lblAyuda.setForeground(COLOR_TEXTO_SECUNDARIO);
         lblAyuda.setFont(FUENTE_ETIQUETA);
 
@@ -303,12 +307,15 @@ public class PagoVentaPendienteForm extends JFrame {
             lblResumen.setText("La venta N° " + numero + " ya fue pagada: no se puede cobrar de nuevo.");
         } else if (EstadoPago.PENDIENTE.name().equals(estado)) {
             btnProcesar.setEnabled(true);
-            lblResumen.setText("Transacción de la venta N° " + numero
-                    + " pendiente de pago. Seleccione el método y procese el pago.");
+            lblResumen.setText("Venta N° " + numero
+                    + " pendiente de pago. Seleccione el método y procese el cobro.");
+        } else if (EstadoPago.RECHAZADO.name().equals(estado)) {
+            btnProcesar.setEnabled(true);
+            lblResumen.setText("El último cobro de la venta N° " + numero
+                    + " fue rechazado.");
         } else {
             btnProcesar.setEnabled(false);
-            lblResumen.setText("La venta N° " + numero + " está " + estado
-                    + ". Cámbiela a PENDIENTE en Modificación de ventas si desea reintentar el pago.");
+            lblResumen.setText("La venta N° " + numero + " está " + estado + ": no se puede cobrar.");
         }
     }
 
@@ -318,7 +325,7 @@ public class PagoVentaPendienteForm extends JFrame {
             return;
         }
         if (numeroVentaCargada < 0 || itemsVenta.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Busque primero la venta pendiente que desea pagar.",
+            JOptionPane.showMessageDialog(this, "Seleccione la venta pendiente que desea pagar.",
                     "Advertencia", JOptionPane.WARNING_MESSAGE);
             return;
         }
@@ -342,12 +349,11 @@ public class PagoVentaPendienteForm extends JFrame {
         }
         for (Document item : items) {
             String estado = item.getString("estado");
-            if (EstadoPago.PROCESADO.name().equals(estado) || !EstadoPago.PENDIENTE.name().equals(estado)) {
+            // solo se bloquea una venta ya cobrada; PENDIENTE y RECHAZADO se pueden pagar
+            if (EstadoPago.PROCESADO.name().equals(estado)) {
                 mostrarVenta(numero, items);
                 JOptionPane.showMessageDialog(this,
-                        EstadoPago.PROCESADO.name().equals(estado)
-                                ? "La venta N° " + numero + " ya fue pagada y no se puede cobrar de nuevo."
-                                : "La venta N° " + numero + " no está pendiente de pago (estado: " + estado + ").",
+                        "La venta N° " + numero + " ya fue pagada, cobrara de nuevo.",
                         "Pago no permitido", JOptionPane.WARNING_MESSAGE);
                 return;
             }
@@ -358,7 +364,7 @@ public class PagoVentaPendienteForm extends JFrame {
         IMetodoPago metodoPago = pedirMetodoPago(metodoNombre, total);
         if (metodoPago == null) {
             JOptionPane.showMessageDialog(this,
-                    "No se capturaron los datos del método de pago.\nLa venta N° " + numero + " sigue PENDIENTE.",
+                    "No se capturaron los datos del método de pago.\nLa venta N° " + numero,
                     "Pago no procesado", JOptionPane.WARNING_MESSAGE);
             return;
         }
@@ -368,23 +374,34 @@ public class PagoVentaPendienteForm extends JFrame {
         Transaccion transaccion = metodoPago.procesar(resumen);
         transaccion.setMensaje(metodoPago.getMensajeError());
 
+        // la venta toma el resultado del cobro, PROCESADO si se pago, RECHAZADO si hubo error
+        EstadoPago resultado = transaccion.getEstado();
+
         try {
-            transaccionDAO.insertar(transaccion);
-            if (transaccion.getEstado() == EstadoPago.PROCESADO) {
-                if (!dao.cambiarEstado(numero, EstadoPago.PROCESADO, metodoNombre)) {
-                    JOptionPane.showMessageDialog(this,
-                            "La transacción se registró, pero la venta no pudo actualizarse a PROCESADO.",
-                            "Error al actualizar", JOptionPane.ERROR_MESSAGE);
-                    return;
-                }
+            // se reutiliza la transaccion creada al registrar la venta, una sola por venta
+            Document registrada = transaccionDAO.buscarPorVenta(numero);
+            if (registrada != null) {
+                transaccionDAO.actualizar(registrada.getObjectId("_id"), resultado, metodoNombre);
+            } else {
+                transaccionDAO.insertar(transaccion);
+            }
+
+            if (!dao.cambiarEstado(numero, resultado, metodoNombre)) {
+                JOptionPane.showMessageDialog(this,
+                        "La transacción se registró, pero la venta no pudo actualizarse a " + resultado + ".",
+                        "Error al actualizar", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            if (resultado == EstadoPago.PROCESADO) {
                 JOptionPane.showMessageDialog(this,
                         metodoPago.comprobante(transaccion) + "\nVenta N° " + numero + " pagada.",
                         "Pago registrado", JOptionPane.INFORMATION_MESSAGE);
             } else {
-                // rechazado, la venta sigue PENDIENTE para poder reintentar el cobro
                 String motivo = transaccion.getMensaje() != null ? transaccion.getMensaje() : "Pago no confirmado.";
                 JOptionPane.showMessageDialog(this,
-                        "El pago fue rechazado: " + motivo + "\nLa venta N° " + numero + " sigue PENDIENTE.",
+                        "El pago fue rechazado: " + motivo + "\nLa venta N° " + numero
+                                + " quedó en estado " + resultado + ".\nPuede reintentar el cobro con otro método.",
                         "Pago rechazado", JOptionPane.WARNING_MESSAGE);
             }
         } catch (MongoException ex) {

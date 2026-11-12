@@ -15,11 +15,9 @@ import java.awt.event.WindowEvent;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
-import javax.swing.JComboBox;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
@@ -34,7 +32,6 @@ import com.mongodb.MongoException;
 import com.ues.procesamiento_pago.Model.EstadoPago;
 import com.ues.procesamiento_pago.Model.Transaccion;
 import com.ues.procesamiento_pago.Model.Venta;
-import com.ues.procesamiento_pago.Strategy.IMetodoPago;
 import com.ues.procesamiento_pago.Strategy.MetodoPago;
 import com.ues.procesamiento_pago.config.MongoDBConnection;
 import com.ues.procesamiento_pago.dao.TransaccionDAO;
@@ -50,7 +47,6 @@ public class VentasForm extends JFrame {
     private JTextField txtTotal;
     private JTextField txtTotalVenta;
     private JTextField txtNumeroVenta;
-    private JComboBox<String> comboMetodos;
     private JButton btnAgregar;
     private JButton btnGuardar;
     private TableVentasModel modeloTabla;
@@ -63,19 +59,12 @@ public class VentasForm extends JFrame {
     private int numeroVentaActual = 1;
 
     private final String usuario;
+    private final MongoDBConnection mongoDB;
     private final VentaDAO dao;
     private final TransaccionDAO transaccionDAO;
     private final List<Venta> ventasPendientes = new ArrayList<>();
 
-    private final String[] METODOS = {
-        "Efectivo", "Pago con tarjeta", "Pago Electronico", "Transferencia Bancaria"
-    };
-
-    private static final Map<String, String[]> DATOS_POR_METODO = Map.of(
-        "Pago con tarjeta", new String[]{"Número de la tarjeta:", "Nombre del titular:"},
-        "Pago Electronico", new String[]{"Correo de la cuenta:", "Plataforma de pago:"},
-        "Transferencia Bancaria", new String[]{"Número de cuenta origen:", "Número de cuenta destino:"}
-    );
+    private static final String METODO_PENDIENTE = "Sin definir";
 
     private static final Color COLOR_FONDO = Color.DARK_GRAY;
     private static final Color COLOR_TEXTO_SECUNDARIO = new Color(160, 160, 160);
@@ -88,6 +77,7 @@ public class VentasForm extends JFrame {
 
     public VentasForm(MongoDBConnection mongoDB, String usuario) {
         this.usuario = usuario;
+        this.mongoDB = mongoDB;
         if (mongoDB != null && mongoDB.getDatabase() != null) {
             this.dao = new VentaDAO(mongoDB);
         } else {
@@ -97,7 +87,7 @@ public class VentasForm extends JFrame {
         this.transaccionDAO = dao != null ? new TransaccionDAO(mongoDB) : null;
         this.numeroVentaActual = dao != null ? dao.siguienteNumeroVenta() : 1;
 
-        setTitle("Ingreso de ventas");
+        setTitle("Registro de ventas");
         setSize(1080, 740);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
@@ -155,7 +145,7 @@ public class VentasForm extends JFrame {
         agregar(panel, new JScrollPane(tablaVentas), 5, 1, SIN_MARGEN);
         agregar(panel, crearPanelNumeroVenta(), 6, 0, new Insets(8, 0, 0, 0));
         agregar(panel, crearPanelTotal(), 7, 0, new Insets(4, 0, 8, 0));
-        agregar(panel, crearPanelPago(), 8, 0, SIN_MARGEN);
+        agregar(panel, crearPanelAviso(), 8, 0, SIN_MARGEN);
         agregar(panel, crearPanelBotones(), 9, 0, SIN_MARGEN);
         return panel;
     }
@@ -196,15 +186,8 @@ public class VentasForm extends JFrame {
         return panel;
     }
 
-    private JPanel crearPanelPago() {
+    private JPanel crearPanelAviso() {
         JPanel panel = crearPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
-        comboMetodos = new JComboBox<>(METODOS);
-        comboMetodos.setPreferredSize(new Dimension(200, 30));
-        comboMetodos.setBackground(Color.WHITE);
-        comboMetodos.setForeground(Color.BLACK);
-        comboMetodos.setFont(FUENTE_ETIQUETA);
-        panel.add(etiquetaDestacada("MÉTODO DE PAGO:"));
-        panel.add(comboMetodos);
         return panel;
     }
 
@@ -252,7 +235,6 @@ public class VentasForm extends JFrame {
         });
     }
 
-    // metodo unificado para agregar nuevo o actualizar el seleccionado
     private void agregarOActualizarProducto() {
         String nombre = txtNombre.getText().trim();
         String precioStr = txtPrecio.getText().trim();
@@ -268,7 +250,7 @@ public class VentasForm extends JFrame {
             int cantidad = Integer.parseInt(cantidadStr);
 
             if (indiceFilaSeleccionada == -1) {
-                // agregamos nuevo registro si no hay ninguno seleccionado
+                // se agrega nuevo registro si no hay ninguno seleccionado
                 modeloTabla.agregar(new Venta(nombre, precio, cantidad));
             } else {
                 // actualizamos el registro existente en la posicion seleccionada
@@ -292,38 +274,12 @@ public class VentasForm extends JFrame {
         }
     }
 
+
     private void registrarVenta() {
         if (ventasPendientes.isEmpty()) {
             JOptionPane.showMessageDialog(this, "Agregue al menos un producto antes de registrar la venta.", "Advertencia", JOptionPane.WARNING_MESSAGE);
             return;
         }
-
-        int numeroRegistrado = numeroVentaActual;
-        String metodoNombre = (String) comboMetodos.getSelectedItem();
-        BigDecimal totalRegistrado = totalVenta();
-        IMetodoPago metodoPago = pedirMetodoPago(totalRegistrado);
-
-        Transaccion transaccion;
-        if (metodoPago == null) {
-            // no se capturaron los datos del pago, la venta puede guardarse como pendiente
-            int opcion = JOptionPane.showConfirmDialog(this,
-                    "No se completaron los datos del método de pago.\n¿Desea guardar la venta N° "
-                            + numeroRegistrado + " con estado PENDIENTE?",
-                    "Venta pendiente", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
-            if (opcion != JOptionPane.YES_OPTION) {
-                return;
-            }
-            transaccion = new Transaccion(numeroRegistrado, metodoNombre, totalRegistrado, EstadoPago.PENDIENTE);
-            transaccion.setMensaje("Los datos del método de pago no fueron capturados.");
-        } else {
-            Venta resumen = new Venta("Venta de " + ventasPendientes.size() + " producto(s)", totalRegistrado, 1);
-            resumen.setId(numeroRegistrado);
-            transaccion = metodoPago.procesar(resumen);
-            transaccion.setMensaje(metodoPago.getMensajeError());
-        }
-
-        // estado que resulto de la validacion del pago: PROCESADO, RECHAZADO o PENDIENTE
-        EstadoPago estado = transaccion.getEstado();
 
         if (dao == null || transaccionDAO == null) {
             JOptionPane.showMessageDialog(this, "No hay conexión con la base de datos: la venta no se guardó.",
@@ -331,37 +287,43 @@ public class VentasForm extends JFrame {
             return;
         }
 
-        
-        if (!guardarVenta(numeroRegistrado, estado, metodoNombre, transaccion)) {
+        int numeroRegistrado = numeroVentaActual;
+        BigDecimal totalRegistrado = totalVenta();
+
+        Transaccion transaccion = new Transaccion(numeroRegistrado, METODO_PENDIENTE,
+                totalRegistrado, EstadoPago.PENDIENTE);
+
+        if (!guardarVenta(numeroRegistrado, transaccion)) {
             return;
         }
+
         numeroVentaActual = dao.siguienteNumeroVenta();
         txtNumeroVenta.setText(String.valueOf(numeroVentaActual));
 
-        if (estado == EstadoPago.PROCESADO && metodoPago != null) {
-            JOptionPane.showMessageDialog(this, metodoPago.comprobante(transaccion), "Venta registrada", JOptionPane.INFORMATION_MESSAGE);
-        } else {
-            String motivo = transaccion.getMensaje();
-            JOptionPane.showMessageDialog(this,
-                    "La venta N° " + numeroRegistrado + " se guardó con estado " + estado + ".\n"
-                            + (motivo != null ? motivo : "Pago no confirmado."),
-                    "Venta registrada con estado " + estado, JOptionPane.WARNING_MESSAGE);
-        }
+        int opcion = JOptionPane.showConfirmDialog(this,
+                "Venta N° " + numeroRegistrado + " registrada por $" + MetodoPago.formatear(totalRegistrado)
+                        + "\n¿Desea Realzar el pago?",
+                "Venta registrada", JOptionPane.YES_NO_OPTION, JOptionPane.INFORMATION_MESSAGE);
+
         modeloTabla.limpiar();
         indiceFilaSeleccionada = -1;
         btnAgregar.setText("AGREGAR PRODUCTO");
         txtItem.setText("1");
         txtTotalVenta.setText("$0.00");
-        
+
         txtNombre.requestFocusInWindow();
+
+        if (opcion == JOptionPane.YES_OPTION && mongoDB != null) {
+            new PagoVentaPendienteForm(mongoDB, numeroRegistrado).setVisible(true);
+        }
     }
 
-    // guarda los items de la venta y su transaccion de pago principal
-    private boolean guardarVenta(int numeroVenta, EstadoPago estado, String metodo, Transaccion transaccion) {
+    // guarda los items de la venta y su transaccion principal, ambos en estado PENDIENTE
+    private boolean guardarVenta(int numeroVenta, Transaccion transaccion) {
         try {
             for (Venta item : ventasPendientes) {
                 item.setId(numeroVenta);
-                dao.insertar(item, estado, metodo, usuario);
+                dao.insertar(item, EstadoPago.PENDIENTE, METODO_PENDIENTE, usuario);
             }
             transaccionDAO.insertar(transaccion);
             return true;
@@ -378,46 +340,6 @@ public class VentasForm extends JFrame {
             total = total.add(venta.getTotal());
         }
         return total;
-    }
-
-    private IMetodoPago pedirMetodoPago(BigDecimal total) {
-        String metodo = (String) comboMetodos.getSelectedItem();
-        if (metodo == null) {
-            return null;
-        }
-        if ("Efectivo".equals(metodo)) {
-            BigDecimal recibido = pedirMonto("Monto entregado por el cliente:", total);
-            return recibido == null ? null : MetodoPago.crear(metodo, recibido);
-        }
-
-        String[] preguntas = DATOS_POR_METODO.get(metodo);
-        String[] datos = new String[preguntas.length];
-        for (int i = 0; i < preguntas.length; i++) {
-            String dato = pedirTexto(preguntas[i]);
-            if (dato == null) {
-                return null;
-            }
-            datos[i] = dato.trim();
-        }
-        return MetodoPago.crear(metodo, null, datos);
-    }
-
-    private BigDecimal pedirMonto(String mensaje, BigDecimal sugerido) {
-        while (true) {
-            String entrada = JOptionPane.showInputDialog(this, mensaje, sugerido.toPlainString());
-            if (entrada == null) {
-                return null;
-            }
-            try {
-                return new BigDecimal(entrada.trim());
-            } catch (NumberFormatException e) {
-                JOptionPane.showMessageDialog(this, "Ingrese un monto numérico válido.", "Error de formato", JOptionPane.ERROR_MESSAGE);
-            }
-        }
-    }
-
-    private String pedirTexto(String mensaje) {
-        return JOptionPane.showInputDialog(this, mensaje);
     }
 
     private void actualizarTotal() {

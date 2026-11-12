@@ -11,10 +11,10 @@ import java.awt.Insets;
 import java.awt.LayoutManager;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
-import java.util.Arrays;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
@@ -132,7 +132,7 @@ public class ConsultaMovimientosForm extends JFrame {
         comboMetodo = combo(METODOS);
         comboEstado = combo(Arrays.stream(EstadoPago.values()).map(Enum::name).toArray(String[]::new));
 
-        String[] etiquetas = {"DESDE:", "HASTA:", "N° DE VENTA:", "MÉTODO DE PAGO:", "ESTADO:"};
+        String[] etiquetas = {"DESDE:", "HASTA:", "N° DE VENTA:", "MÉTODO DE PAGO:", "ESTADO DE LA TRANSACCIÓN:"};
         Component[] campos = {spDesde, spHasta, txtNumeroVenta, comboMetodo, comboEstado};
 
         for (int i = 0; i < etiquetas.length; i++) {
@@ -220,6 +220,12 @@ public class ConsultaMovimientosForm extends JFrame {
     private void conectarEventos() {
         btnBuscar.addActionListener(e -> buscar());
         txtNumeroVenta.addActionListener(e -> buscar());
+
+        comboEstado.addActionListener(e -> {
+            if (btnBuscar != null) {
+                buscar();
+            }
+        });
         // al seleccionar una transaccion se carga su detalle automaticamente
         tablaTransacciones.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
@@ -235,7 +241,7 @@ public class ConsultaMovimientosForm extends JFrame {
             return;
         }
 
-        // consultar por rango de fechas
+        // consultar por rango de fecha
         Date desde = inicioDelDia((Date) spDesde.getValue());
         Date hasta = finDelDia((Date) spHasta.getValue());
         if (desde.after(hasta)) {
@@ -244,7 +250,7 @@ public class ConsultaMovimientosForm extends JFrame {
             return;
         }
 
-        // consultar la venta asociada por el numero de venta
+        // consultar la venta asociada 
         Integer numeroVenta = null;
         String textoVenta = txtNumeroVenta.getText().trim();
         if (!textoVenta.isEmpty()) {
@@ -268,7 +274,7 @@ public class ConsultaMovimientosForm extends JFrame {
             return;
         }
 
-        // aplicar filtros adicionales en memoria
+
         List<Document> filtradas = new ArrayList<>();
         for (Document transaccion : transacciones) {
             Integer idVenta = transaccion.getInteger("idVenta");
@@ -316,7 +322,7 @@ public class ConsultaMovimientosForm extends JFrame {
         }
     }
 
-    //al elegir una transaccion se listan los items de su venta
+    // al elegir una transaccion se listan los items de su venta
     private void mostrarDetalleSeleccionado() {
         modeloTablaDetalle.setRowCount(0);
 
