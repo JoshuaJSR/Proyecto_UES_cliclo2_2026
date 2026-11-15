@@ -238,9 +238,12 @@ public class VentasForm extends JFrame {
             BigDecimal totalRegistrado = totalVenta();
 
             Transaccion transaccion = new Transaccion(numeroRegistrado, METODO_PENDIENTE, totalRegistrado, EstadoPago.PENDIENTE);
+            if (usuario != null) {
+                transaccion.setUsuario(usuario);
+            }
             for (Venta item : ventasPendientes) {
                 item.setId(numeroRegistrado);
-                dao.insertar(item, EstadoPago.PENDIENTE, METODO_PENDIENTE, usuario);
+                dao.insertar(item, EstadoPago.PENDIENTE, METODO_PENDIENTE);
             }
             transaccionDAO.insertar(transaccion);
 
@@ -260,7 +263,7 @@ public class VentasForm extends JFrame {
             txtNombre.requestFocusInWindow();
 
             if (opcion == JOptionPane.YES_OPTION && mongoDB != null) {
-                new PagoVentaPendienteForm(mongoDB, numeroRegistrado).setVisible(true);
+                new PagoVentaPendienteForm(mongoDB, usuario, numeroRegistrado).setVisible(true);
             }
         } catch (MongoException ex) {
             JOptionPane.showMessageDialog(this, "Error al guardar: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);

@@ -48,10 +48,14 @@ public class PagoVentaPendienteForm extends JFrame {
     private int numeroVentaCargada = -1;
     private final VentaDAO dao;
     private final TransaccionDAO transaccionDAO;
+    private final String usuario;
 
-    public PagoVentaPendienteForm(MongoDBConnection mongoDB) { this(mongoDB, null); }
+    public PagoVentaPendienteForm(MongoDBConnection mongoDB) { this(mongoDB, null, null); }
 
-    public PagoVentaPendienteForm(MongoDBConnection mongoDB, Integer numeroVenta) {
+    public PagoVentaPendienteForm(MongoDBConnection mongoDB, Integer numeroVenta) { this(mongoDB, null, numeroVenta); }
+
+    public PagoVentaPendienteForm(MongoDBConnection mongoDB, String usuario, Integer numeroVenta) {
+        this.usuario = usuario;
         this.dao = (mongoDB != null && mongoDB.getDatabase() != null) ? new VentaDAO(mongoDB) : null;
         this.transaccionDAO = dao != null ? new TransaccionDAO(mongoDB) : null;
         if (dao == null) JOptionPane.showMessageDialog(null, "No hay conexión activa a MongoDB.");
@@ -291,6 +295,9 @@ public class PagoVentaPendienteForm extends JFrame {
         resumen.setId(numeroVentaCargada);
         Transaccion tx = metodoPago.procesar(resumen);
         tx.setMensaje(metodoPago.getMensajeError());
+        if (usuario != null) {
+            tx.setUsuario(usuario);
+        }
 
         try {
             Document reg = transaccionDAO.buscarPorVenta(numeroVentaCargada);

@@ -21,6 +21,7 @@ import com.ues.procesamiento_pago.Model.Transaccion;
 import com.ues.procesamiento_pago.config.MongoDBConnection;
 
 public class TransaccionDAO {
+    
     private final MongoCollection<Document> coleccion;
 
     public TransaccionDAO(MongoDBConnection mongoDB) {
@@ -153,6 +154,9 @@ public class TransaccionDAO {
                 .append("metodo", transaccion.getMetodo())
                 .append("monto", transaccion.getMonto())
                 .append("fecha", transaccion.getFecha());
+        if (transaccion.getUsuario() != null) {
+            cambios.append("usuario", transaccion.getUsuario());
+        }
         Document actualizacion = new Document();
         if (transaccion.getMensaje() != null) {
             cambios.append("mensaje", transaccion.getMensaje());

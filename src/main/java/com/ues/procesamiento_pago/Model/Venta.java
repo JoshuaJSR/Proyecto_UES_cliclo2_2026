@@ -92,14 +92,13 @@ public final class Venta {
     }
 
     //Mapea la venta a un Document de MongoDB para guardarlo en la coleccion ventas
-    public Document toDocument(EstadoPago estado, String metodoPago, String usuario) {
+    public Document toDocument(EstadoPago estado, String metodoPago) {
         return new Document("id", getId())
                 .append("nombre", getNombre())
                 .append("precio", getPrecio())
                 .append("cantidad", getCantidad())
                 .append("total", getTotal())
                 .append("estado", estado.name())
-                .append("metodoPago", metodoPago)
-                .append("usuario", usuario);
+                .append("metodoPago", metodoPago);
     }
 }

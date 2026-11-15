@@ -10,17 +10,23 @@ public class Transaccion {
     private ObjectId id;
     private int idVenta;
     private String metodo;
+    private String usuario; 
     private BigDecimal monto;
     private Date fecha;
     private EstadoPago estado;
     private String mensaje;
 
     public Transaccion(int idVenta, String metodo, BigDecimal monto, EstadoPago estado) {
+        this(idVenta, metodo, monto, estado, null);
+    }
+
+    public Transaccion(int idVenta, String metodo, BigDecimal monto, EstadoPago estado, String usuario) {
         this.idVenta = idVenta;
         this.metodo = metodo;
         this.monto = monto;
         this.fecha = new Date();
         this.estado = estado;
+        this.usuario = usuario;
     }
 
     public ObjectId getId() {
@@ -41,6 +47,14 @@ public class Transaccion {
 
     public String getMetodo() {
         return metodo;
+    }
+
+    public String getUsuario() {
+        return usuario;
+    }
+
+    public void setUsuario(String usuario) {
+        this.usuario = usuario;
     }
 
     public void setMetodo(String metodo) {
@@ -87,6 +101,9 @@ public class Transaccion {
                 .append("monto", getMonto())
                 .append("fecha", getFecha())
                 .append("estado", getEstado() == null ? null : getEstado().name());
+        if (getUsuario() != null) {
+            documento.append("usuario", getUsuario());
+        }
         if (getMensaje() != null) {
             documento.append("mensaje", getMensaje());
         }

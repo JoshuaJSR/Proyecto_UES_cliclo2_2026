@@ -40,9 +40,9 @@ public class VentaController {
                 : dao.listar(idTransaccion, numeroVenta, estado, metodoPago, desde, hasta);
     }
 
-    public void insertar(Venta venta, EstadoPago estado, String metodoPago, String usuario) {
+    public void insertar(Venta venta, EstadoPago estado, String metodoPago) {
         if (dao != null) {
-            dao.insertar(venta, estado, metodoPago, usuario);
+            dao.insertar(venta, estado, metodoPago);
         }
     }
 

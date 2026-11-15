@@ -1,4 +1,3 @@
-
 package com.ues.procesamiento_pago.dao;
 
 import java.util.ArrayList;
@@ -34,8 +33,8 @@ public class VentaDAO {
         this.transaccionDAO = new TransaccionDAO(mongoDB);
     }
 
-    public void insertar(Venta venta, EstadoPago estado, String metodoPago, String usuario) {
-        coleccion.insertOne(venta.toDocument(estado, metodoPago, usuario));
+    public void insertar(Venta venta, EstadoPago estado, String metodoPago) {
+        coleccion.insertOne(venta.toDocument(estado, metodoPago));
     }
 
     // proximo numero de venta sin reservarlo, solo sirve para mostrarlo en pantalla
