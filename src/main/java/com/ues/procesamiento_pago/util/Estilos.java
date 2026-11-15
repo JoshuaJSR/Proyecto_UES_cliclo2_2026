@@ -4,6 +4,10 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Font;
 import javax.swing.*;
+import javax.swing.text.AbstractDocument;
+import javax.swing.text.AttributeSet;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.DocumentFilter;
 
 public class Estilos {
     public static final Color COLOR_FONDO = Color.DARK_GRAY;
@@ -34,6 +38,59 @@ public class Estilos {
         if (anchoFijo > 0) estilarCampo(campo, anchoFijo);
         else estilarCampo(campo);
         return campo;
+    }
+
+    // permite escribir unicamente digitos (cantidades, numeros de venta, etc)
+    public static void soloEnteros(JTextField campo) {
+        ((AbstractDocument) campo.getDocument()).setDocumentFilter(new DocumentFilter() {
+            @Override
+            public void insertString(FilterBypass fb, int offset, String texto, AttributeSet atributos)
+                    throws BadLocationException {
+                if (esEntero(texto)) {
+                    super.insertString(fb, offset, texto, atributos);
+                }
+            }
+
+            @Override
+            public void replace(FilterBypass fb, int offset, int longitud, String texto, AttributeSet atributos)
+                    throws BadLocationException {
+                if (esEntero(texto)) {
+                    super.replace(fb, offset, longitud, texto, atributos);
+                }
+            }
+        });
+    }
+
+    // permite digitos y un unico punto decimal
+    public static void soloDecimales(JTextField campo) {
+        ((AbstractDocument) campo.getDocument()).setDocumentFilter(new DocumentFilter() {
+            @Override
+            public void insertString(FilterBypass fb, int offset, String texto, AttributeSet atributos)
+                    throws BadLocationException {
+                reemplazar(fb, offset, 0, texto, atributos);
+            }
+
+            @Override
+            public void replace(FilterBypass fb, int offset, int longitud, String texto, AttributeSet atributos)
+                    throws BadLocationException {
+                reemplazar(fb, offset, longitud, texto, atributos);
+            }
+
+            private void reemplazar(FilterBypass fb, int offset, int longitud, String texto, AttributeSet atributos)
+                    throws BadLocationException {
+                String actual = fb.getDocument().getText(0, fb.getDocument().getLength());
+                String nuevo = actual.substring(0, offset)
+                        + (texto == null ? "" : texto)
+                        + actual.substring(offset + longitud);
+                if (nuevo.matches("\\d*(\\.\\d*)?")) {
+                    super.replace(fb, offset, longitud, texto, atributos);
+                }
+            }
+        });
+    }
+
+    private static boolean esEntero(String texto) {
+        return texto == null || texto.matches("\\d*");
     }
 
     public static JLabel etiqueta(String texto, boolean destacada) {

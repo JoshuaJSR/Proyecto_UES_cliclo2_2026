@@ -109,6 +109,8 @@ public class VentasForm extends JFrame {
         String[] titulos = {"PRECIO", "CANTIDAD", "TOTAL"};
         JTextField[] campos = {txtPrecio = Estilos.crearCampo(0), txtCantidad = Estilos.crearCampo(0), txtTotal = Estilos.crearCampo(0)};
         campos[2].setEditable(false);
+        Estilos.soloDecimales(txtPrecio);
+        Estilos.soloEnteros(txtCantidad);
 
         for (int i = 0; i < 3; i++) {
             Insets margen = new Insets(0, 0, 0, i < 2 ? 10 : 0);

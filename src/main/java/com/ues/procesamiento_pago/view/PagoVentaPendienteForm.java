@@ -103,6 +103,7 @@ public class PagoVentaPendienteForm extends JFrame {
 
         txtFiltroId = new JTextField();
         Estilos.estilarCampo(txtFiltroId, 90);
+        Estilos.soloEnteros(txtFiltroId);
 
         try {
             MaskFormatter mascara = new MaskFormatter("##/##/####");
@@ -278,9 +279,27 @@ public class PagoVentaPendienteForm extends JFrame {
         
         IMetodoPago metodoPago;
         if ("Efectivo".equals(metodoNombre)) {
-            String res = JOptionPane.showInputDialog(this, "Monto entregado:", total.toPlainString());
-            if (res == null) return;
-            metodoPago = MetodoPago.crear(metodoNombre, new BigDecimal(res.trim()));
+            JTextField campoMonto = new JTextField(total.toPlainString());
+            Estilos.soloDecimales(campoMonto);
+            campoMonto.selectAll();
+
+            JPanel panelMonto = new JPanel(new BorderLayout(0, 6));
+            panelMonto.add(new JLabel("Monto entregado:"), BorderLayout.NORTH);
+            panelMonto.add(campoMonto, BorderLayout.CENTER);
+
+            int opcion = JOptionPane.showConfirmDialog(this, panelMonto, "Pago en efectivo",
+                    JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+            if (opcion != JOptionPane.OK_OPTION) return;
+
+            String res = campoMonto.getText().trim();
+            try {
+                if (res.isEmpty() || res.equals(".")) throw new NumberFormatException();
+                metodoPago = MetodoPago.crear(metodoNombre, new BigDecimal(res));
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(this, "Ingrese un monto numérico válido.", "Monto inválido",
+                        JOptionPane.WARNING_MESSAGE);
+                return;
+            }
         } else {
             String[] preguntas = DATOS_POR_METODO.get(metodoNombre);
             String[] datos = new String[preguntas.length];

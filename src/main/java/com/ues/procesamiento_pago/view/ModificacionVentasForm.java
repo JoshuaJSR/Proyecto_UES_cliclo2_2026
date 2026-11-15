@@ -123,6 +123,7 @@ public class ModificacionVentasForm extends JFrame {
 
         txtFiltroId = campo();
         txtFiltroId.setPreferredSize(new Dimension(90, 32));
+        Estilos.soloEnteros(txtFiltroId);
 
         comboFiltroEstado = combo(ESTADOS, true);
         comboFiltroMetodo = combo(METODOS, true);
@@ -222,7 +223,7 @@ public class ModificacionVentasForm extends JFrame {
         });
     }
 
-    // recupera el Document de la transaccion de la fila indicada 
+    // recuperar  Document de la transaccion de la fila indicada 
     private final List<Document> transaccionesActuales = new java.util.ArrayList<>();
 
     private Document obtenerTransaccionDeFila(int fila) {

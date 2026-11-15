@@ -129,6 +129,7 @@ public class ConsultaMovimientosForm extends JFrame {
         spHasta = fecha(fechaHoy());
         txtNumeroVenta = campo();
         txtNumeroVenta.setPreferredSize(new Dimension(80, 32));
+        Estilos.soloEnteros(txtNumeroVenta);
         comboMetodo = combo(METODOS);
         comboEstado = combo(Arrays.stream(EstadoPago.values()).map(Enum::name).toArray(String[]::new));
 
